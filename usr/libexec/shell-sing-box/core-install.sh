@@ -54,10 +54,14 @@ latest_version() {
         die "missing curl/wget"
     fi
 
-    ver=${final_url##*/}
+    ver=$(printf '%s\n' "$final_url" | sed -n 's#.*/tag/\(v[0-9][^/?#]*\).*#\1#p')
+    [ -n "$ver" ] || ver=${final_url##*/}
     case "$ver" in
         v[0-9]*) printf '%s\n' "$ver" ;;
-        *) die "failed to resolve latest stable sing-box version" ;;
+        *)
+            printf '%s\n' "ERROR: failed to resolve latest stable sing-box version from: $final_url" >&2
+            return 1
+            ;;
     esac
 }
 
@@ -81,13 +85,14 @@ download_core() {
         return 0
     fi
 
-    die "failed to download sing-box core: $origin"
+    printf '%s\n' "ERROR: failed to download sing-box core: $origin" >&2
+    return 1
 }
 
 install_core() {
-    ver=$(latest_version)
+    ver=$(latest_version) || exit 1
     arch=$(detect_arch)
-    archive=$(download_core "$ver" "$arch")
+    archive=$(download_core "$ver" "$arch") || exit 1
     tmpdir="$RUNTIME_DIR/core.$$"
     bindir=$(dirname "$SING_BOX_BIN")
 

@@ -31,7 +31,7 @@ ENABLE_IPV6=${ENABLE_IPV6:-0}
 
 log() {
     logger -t shell-sing-box "$*"
-    printf '%s\n' "$*"
+    printf '%s\n' "$*" >&2
 }
 
 die() {
