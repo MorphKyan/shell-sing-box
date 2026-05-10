@@ -39,6 +39,21 @@ export url='https://testingcf.jsdelivr.net/gh/<owner>/<repo>@<branch>/shell-sing
 If your repository root is the `shell-sing-box` directory itself, omit the
 trailing `/shell-sing-box` in `url`.
 
+GitHub raw install, useful when CDN cache is stale:
+
+```sh
+export url='https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
+  && sh -c "$(curl -kfsSL $url/install.sh)"
+```
+
+GitHub raw with `wget`:
+
+```sh
+export url='https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
+  && wget --no-check-certificate -q -O /tmp/shell-sing-box-install.sh "$url/install.sh" \
+  && sh /tmp/shell-sing-box-install.sh
+```
+
 Copy this directory to the router and run:
 
 ```sh

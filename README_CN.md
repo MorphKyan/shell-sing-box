@@ -50,6 +50,21 @@ export url='https://testingcf.jsdelivr.net/gh/<owner>/<repo>@<branch>/shell-sing
 
 如果你的仓库根目录就是 `shell-sing-box`，则 `url` 末尾不需要加 `/shell-sing-box`。
 
+GitHub raw 安装命令，适合 jsDelivr 缓存还没刷新时使用：
+
+```sh
+export url='https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
+  && sh -c "$(curl -kfsSL $url/install.sh)"
+```
+
+GitHub raw + `wget`：
+
+```sh
+export url='https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
+  && wget --no-check-certificate -q -O /tmp/shell-sing-box-install.sh "$url/install.sh" \
+  && sh /tmp/shell-sing-box-install.sh
+```
+
 把整个 `shell-sing-box` 目录复制到路由器，然后执行：
 
 ```sh
