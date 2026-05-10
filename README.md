@@ -96,6 +96,27 @@ https://gh.llkk.cc/https://github.com/SagerNet/sing-box/releases/download/...
 
 If the proxy fails, the installer falls back to the original GitHub URL.
 
+The installer keeps a ShellCrash-style minimal footprint: it only installs
+missing hard requirements, and does not install convenience packages such as
+`curl`, `libcurl`, `libnghttp2`, `unzip`, or certificate bundles.
+
+Hard requirements are:
+
+- `nft`
+- `ip`
+- `wget` or `curl`
+- TUN kernel support
+
+If these are missing and `opkg` exists, the installer only tries to install the
+corresponding minimal packages:
+
+```text
+nftables ip-full wget-ssl kmod-tun
+```
+
+It assumes the base firmware already has `sh`, `tar`, `gzip`, `awk`, `sed`,
+`grep`, `find`, and other BusyBox basics.
+
 `CORE_VERSION=latest` follows GitHub's latest non-prerelease release. To pin a
 version, set for example:
 
@@ -161,6 +182,10 @@ Install or refresh Zashboard:
 ```sh
 /usr/libexec/shell-sing-box/task.sh update-dashboard
 ```
+
+Dashboard extraction uses existing `unzip` or `busybox unzip`. If neither is
+available, install a dashboard manually into `/etc/sing-box/ui`, or install
+`unzip` yourself.
 
 Open:
 

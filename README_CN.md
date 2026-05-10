@@ -59,11 +59,28 @@ chmod +x install.sh
 
 安装脚本会：
 
-- 安装基础依赖：`nftables`、`kmod-tun`、证书、`curl`、`unzip` 等。
+- 只安装缺失的硬依赖，不安装非必要包。
 - 不通过 `opkg` 安装 sing-box。
 - 从官方最新稳定版 release 下载 sing-box 内核到 `/etc/sing-box/bin/sing-box`。
 - 复制服务、脚本和默认配置。
 - 启用 `/etc/init.d/shell-sing-box`。
+
+这遵循 ShellCrash 的思路：少安装东西，能用系统已有工具就不额外安装。安装脚本不会主动安装 `curl`、`libcurl`、`libnghttp2`、`unzip`、证书包等非必要组件。
+
+硬依赖：
+
+- `nft`
+- `ip`
+- `wget` 或 `curl`
+- TUN 内核支持
+
+如果缺失且系统存在 `opkg`，只会尝试安装对应最小包：
+
+```text
+nftables ip-full wget-ssl kmod-tun
+```
+
+脚本默认认为固件已有 BusyBox 基础工具，例如 `sh`、`tar`、`gzip`、`awk`、`sed`、`grep`、`find`。
 
 然后把你的订阅生成器输出放到：
 
@@ -249,6 +266,8 @@ pool.ntp.org
 ```sh
 /usr/libexec/shell-sing-box/task.sh update-dashboard
 ```
+
+面板解压会优先使用系统已有的 `unzip` 或 `busybox unzip`。如果两者都没有，可以手动把 Zashboard 放到 `/etc/sing-box/ui`，或者自行安装 `unzip`。
 
 访问地址：
 

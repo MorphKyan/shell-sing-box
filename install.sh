@@ -21,9 +21,17 @@ need_root() {
 }
 
 install_packages() {
-    if command -v opkg >/dev/null 2>&1; then
+    command -v opkg >/dev/null 2>&1 || return 0
+
+    missing=
+    command -v nft >/dev/null 2>&1 || missing="$missing nftables"
+    command -v ip >/dev/null 2>&1 || missing="$missing ip-full"
+    command -v wget >/dev/null 2>&1 || command -v curl >/dev/null 2>&1 || missing="$missing wget-ssl"
+    [ -c /dev/net/tun ] || missing="$missing kmod-tun"
+
+    if [ -n "$missing" ]; then
         opkg update || true
-        opkg install nftables kmod-tun ca-bundle ca-certificates unzip curl || true
+        opkg install $missing || true
     fi
 }
 
