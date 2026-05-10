@@ -7,7 +7,7 @@ generator.
 ## Defaults
 
 - Service: `/etc/init.d/shell-sing-box`
-- sing-box binary: `/etc/sing-box/bin/sing-box`
+- sing-box runtime binary: `/tmp/shell-sing-box/bin/sing-box`
 - Generated config input: `/etc/sing-box/generated/config.json`
 - Runtime config directory: `/tmp/shell-sing-box/config`
 - TCP transparent redirect inbound: `9998`
@@ -79,10 +79,16 @@ Edit `/etc/sing-box/custom.env`.
 
 Important settings:
 
-- `CORE_VERSION=latest`
+- `CORE_VERSION=v1.13.11`
 - `CORE_ARCH=auto`
+- `CORE_REPO_BASE=https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box`
+- `CORE_REPO_RAW_BASE=https://ghproxy.net/https://raw.githubusercontent.com/MorphKyan/shell-sing-box`
+- `CORE_REPO_ORIGIN_RAW_BASE=https://raw.githubusercontent.com/MorphKyan/shell-sing-box`
+- `CORE_REPO_BRANCH=update`
+- `CORE_REPO_PATH=bin/sing-box`
 - `GITHUB_PROXY_PREFIX=https://gh.llkk.cc/`
 - `CORE_DOWNLOAD_PREFIX=https://gh.llkk.cc/`
+- `CORE_ALLOW_RELEASE_FALLBACK=0`
 - `REDIR_PORT=9998`
 - `API_PORT=9999`
 - `DNS_PORT=1053`
@@ -96,20 +102,58 @@ Edit `/etc/sing-box/fake_ip_filter.list` for fake-ip exclusions.
 
 ## sing-box Core
 
-The installer does not use `opkg install sing-box`. It downloads the latest
-stable upstream sing-box release into:
+The installer does not use `opkg install sing-box`. By default it follows the
+ShellCrash packaging style: sing-box archives are prepacked in this project's
+`update` branch and extracted into tmpfs:
 
 ```sh
-/etc/sing-box/bin/sing-box
+/tmp/shell-sing-box/bin/sing-box
 ```
 
-Domestic mirror/proxy sources are preferred. The default core download path is:
+This avoids filling small OpenWrt overlay partitions with the 60MB+ uncompressed
+binary. If tmpfs is cleared after reboot, `prepare.sh` downloads and extracts the
+core again before starting sing-box.
+
+Default core download order:
+
+1. GitHub raw mirror package:
+   `https://ghproxy.net/https://raw.githubusercontent.com/MorphKyan/shell-sing-box/update/bin/sing-box/<asset>`
+2. jsDelivr project package:
+   `https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@update/bin/sing-box/<asset>`
+3. GitHub raw project package:
+   `https://raw.githubusercontent.com/MorphKyan/shell-sing-box/update/bin/sing-box/<asset>`
+4. Optional upstream release fallback, only when `CORE_ALLOW_RELEASE_FALLBACK=1`
+
+For OpenWrt/ImmortalWrt, the installer reads `DISTRIB_ARCH` from
+`/etc/openwrt_release` and selects pre-extracted OpenWrt assets like:
+
+```text
+sing-box-1.13.11-openwrt-aarch64_cortex-a53.tar.gz
+```
+
+The primary package URL is:
+
+```text
+https://ghproxy.net/https://raw.githubusercontent.com/MorphKyan/shell-sing-box/update/bin/sing-box/sing-box-1.13.11-openwrt-aarch64_cortex-a53.tar.gz
+```
+
+The jsDelivr package URL is also configured as a fallback:
+
+```text
+https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@update/bin/sing-box/sing-box-1.13.11-openwrt-aarch64_cortex-a53.tar.gz
+```
+
+If you explicitly enable upstream fallback, the proxy URL is:
 
 ```text
 https://gh.llkk.cc/https://github.com/SagerNet/sing-box/releases/download/...
 ```
 
-If the proxy fails, the installer falls back to the original GitHub URL.
+The default does not fetch GitHub Release assets. To update the packaged core,
+extract `/usr/bin/sing-box` from the official OpenWrt `.ipk`, package it as a
+tar.gz archive, and upload it to the `update` branch under `bin/sing-box/`. The
+downloaded archive is extracted and the installed binary is checked with
+`sing-box version`.
 
 The installer keeps a ShellCrash-style minimal footprint: it only installs
 missing hard requirements, and does not install convenience packages such as
@@ -132,12 +176,16 @@ nftables ip-full wget-ssl kmod-tun
 It assumes the base firmware already has `sh`, `tar`, `gzip`, `awk`, `sed`,
 `grep`, `find`, and other BusyBox basics.
 
-`CORE_VERSION=latest` follows GitHub's latest non-prerelease release. To pin a
-version, set for example:
+The default `CORE_VERSION` is pinned to the packaged core version:
 
 ```sh
-CORE_VERSION=v1.12.0
+CORE_VERSION=v1.13.11
 ```
+
+This matches the ShellCrash-style prepacked archive under the `update` branch.
+You may set `CORE_VERSION=latest`, but then the matching archive must also
+exist under `bin/sing-box/`, otherwise startup will fail unless upstream release
+fallback is explicitly enabled.
 
 `CORE_ARCH=auto` maps `uname -m` to sing-box release assets such as `arm64` or
 `armv7`. Override it if your device needs a specific ARM build.
@@ -148,6 +196,20 @@ Manual core update:
 /usr/libexec/shell-sing-box/core-install.sh
 /etc/init.d/shell-sing-box restart
 ```
+
+## GitHub Actions Core Build
+
+`.github/workflows/build-core.yml` builds the slim sing-box core.
+
+Current build tags:
+
+```text
+with_quic,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0
+```
+
+This keeps QUIC, uTLS, and Clash API while excluding heavier features such as
+gVisor, WireGuard, Tailscale, NaiveProxy, ACME, and DHCP. Manual workflow runs
+can optionally publish the packaged core to the `update` branch.
 
 ## SRS behavior
 

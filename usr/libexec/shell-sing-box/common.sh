@@ -9,7 +9,7 @@ CONFIG_SOURCE_FILE=${CONFIG_SOURCE_FILE:-$BASE_DIR/generated/config.json}
 CONFIG_RUNTIME_DIR=${CONFIG_RUNTIME_DIR:-$RUNTIME_DIR/config}
 RULESET_DIR=${RULESET_DIR:-$BASE_DIR/ruleset}
 UI_DIR=${UI_DIR:-$BASE_DIR/ui}
-SING_BOX_BIN=${SING_BOX_BIN:-/usr/bin/sing-box}
+SING_BOX_BIN=${SING_BOX_BIN:-/tmp/shell-sing-box/bin/sing-box}
 REDIR_PORT=${REDIR_PORT:-9998}
 API_PORT=${API_PORT:-9999}
 DNS_PORT=${DNS_PORT:-1053}
@@ -51,19 +51,18 @@ download() {
     out=$1
     url=$2
     tmp="${out}.tmp.$$"
+    mkdir -p "$(dirname "$out")" || return 1
     rm -f "$tmp"
-    if command -v curl >/dev/null 2>&1; then
-        curl -L --connect-timeout 10 --retry 2 -kfsS -o "$tmp" "$url"
-    elif command -v wget >/dev/null 2>&1; then
-        wget --no-check-certificate -T 20 -O "$tmp" "$url"
+    if command -v wget >/dev/null 2>&1; then
+        wget --no-check-certificate -T 10 -q -O "$tmp" "$url" || { rm -f "$tmp"; return 1; }
+    elif command -v curl >/dev/null 2>&1; then
+        curl -L -kfsS --connect-timeout 10 -o "$tmp" "$url" || { rm -f "$tmp"; return 1; }
     else
         return 1
     fi
-    [ -s "$tmp" ] || {
-        rm -f "$tmp"
-        return 1
-    }
-    mv -f "$tmp" "$out"
+    [ -s "$tmp" ] && mv -f "$tmp" "$out" && return 0
+    rm -f "$tmp"
+    return 1
 }
 
 mirror_url() {

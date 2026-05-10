@@ -3,6 +3,7 @@
 . /usr/libexec/shell-sing-box/common.sh
 
 main() {
+    [ -x "$SING_BOX_BIN" ] || /usr/libexec/shell-sing-box/core-install.sh
     need_cmd "$SING_BOX_BIN"
     need_cmd ip
     need_cmd nft
