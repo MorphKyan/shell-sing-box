@@ -1,0 +1,21 @@
+# Local and device-discovery domains that should not receive fake-ip answers.
+localhost
+*.lan
+*.local
+*.localdomain
+*.home.arpa
+router.asus.com
+time.android.com
+time.apple.com
+time.windows.com
+pool.ntp.org
+*.ntp.org
+*.msftconnecttest.com
+*.msftncsi.com
+*.stun.*
+stun.*.*
+*.miwifi.com
+*.tplinkwifi.net
+*.tendawifi.com
+*.mediatek.com
+*.ntp.aliyun.com

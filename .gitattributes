@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+*.sh text eol=lf
+etc/init.d/* text eol=lf
+etc/sing-box/* text eol=lf
+*.md text eol=lf
