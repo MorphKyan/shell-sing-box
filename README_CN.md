@@ -40,6 +40,14 @@ export url='https://testingcf.jsdelivr.net/gh/<owner>/<repo>@<branch>/shell-sing
   && sh -c "$(curl -kfsSL $url/install.sh)"
 ```
 
+如果设备没有 `curl`，使用 `wget`：
+
+```sh
+export url='https://testingcf.jsdelivr.net/gh/<owner>/<repo>@<branch>/shell-sing-box' \
+  && wget --no-check-certificate -q -O /tmp/shell-sing-box-install.sh "$url/install.sh" \
+  && sh /tmp/shell-sing-box-install.sh
+```
+
 如果你的仓库根目录就是 `shell-sing-box`，则 `url` 末尾不需要加 `/shell-sing-box`。
 
 把整个 `shell-sing-box` 目录复制到路由器，然后执行：

@@ -28,6 +28,14 @@ export url='https://testingcf.jsdelivr.net/gh/<owner>/<repo>@<branch>/shell-sing
   && sh -c "$(curl -kfsSL $url/install.sh)"
 ```
 
+If `curl` is not available, use `wget`:
+
+```sh
+export url='https://testingcf.jsdelivr.net/gh/<owner>/<repo>@<branch>/shell-sing-box' \
+  && wget --no-check-certificate -q -O /tmp/shell-sing-box-install.sh "$url/install.sh" \
+  && sh /tmp/shell-sing-box-install.sh
+```
+
 If your repository root is the `shell-sing-box` directory itself, omit the
 trailing `/shell-sing-box` in `url`.
 
