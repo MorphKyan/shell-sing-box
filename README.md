@@ -211,6 +211,9 @@ This keeps QUIC, uTLS, and Clash API while excluding heavier features such as
 gVisor, WireGuard, Tailscale, NaiveProxy, ACME, and DHCP. Manual workflow runs
 can optionally publish the packaged core to the `update` branch.
 
+The workflow injects `github.com/sagernet/sing-box/constant.Version`, so
+`sing-box version` reports the selected release instead of `unknown`.
+
 ## SRS behavior
 
 The service scans remote `.srs` rule sets in the runtime sing-box config and

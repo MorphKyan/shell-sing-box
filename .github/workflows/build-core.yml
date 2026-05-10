@@ -35,7 +35,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set build version
-        run: echo "SING_BOX_VERSION=${{ github.event.inputs.sing_box_version || 'v1.13.11' }}" >> "$GITHUB_ENV"
+        run: |
+          version="${{ github.event.inputs.sing_box_version || 'v1.13.11' }}"
+          echo "SING_BOX_VERSION=$version" >> "$GITHUB_ENV"
+          echo "PLAIN_VERSION=${version#v}" >> "$GITHUB_ENV"
 
       - name: Checkout sing-box
         run: git clone --depth 1 --branch "$SING_BOX_VERSION" "$SING_BOX_REPO" sing-box
@@ -52,7 +55,7 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go build -v -trimpath \
               -tags "$BUILD_TAGS" \
-              -ldflags "-s -w -buildid=" \
+              -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${PLAIN_VERSION}' -s -w -buildid=" \
               -o ../sing-box-smoke \
               ./cmd/sing-box
 
@@ -91,7 +94,7 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" GOARM64="$GOARM64" \
             go build -v -trimpath \
               -tags "$BUILD_TAGS" \
-              -ldflags "-s -w -buildid=" \
+              -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${PLAIN_VERSION}' -s -w -buildid=" \
               -o ../sing-box \
               ./cmd/sing-box
 

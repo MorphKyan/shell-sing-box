@@ -222,6 +222,8 @@ with_quic,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0
 
 保留 QUIC/uTLS/Clash API，去掉 gVisor、WireGuard、Tailscale、NaiveProxy、ACME、DHCP 等非必要功能。手动运行 workflow 时可以选择是否发布到 `update` 分支。
 
+workflow 会注入 `github.com/sagernet/sing-box/constant.Version`，所以 `sing-box version` 会显示选择的版本号，而不是 `unknown`。
+
 ## 配置生成方式
 
 你的订阅生成器负责输出主配置：
