@@ -71,7 +71,7 @@ main() {
     install_packages
     copy_tree "$SRC_DIR/etc" /etc
     copy_tree "$SRC_DIR/usr" /usr
-    mkdir -p /etc/sing-box/generated /etc/sing-box/ruleset /etc/sing-box/ui /tmp/shell-sing-box
+    mkdir -p /etc/sing-box/generated /etc/sing-box/ruleset /etc/sing-box/ui /etc/sing-box/bin /tmp/shell-sing-box
     chmod 755 /etc/init.d/shell-sing-box
     chmod 755 /usr/libexec/shell-sing-box/*.sh
     chmod 755 /usr/sbin/ssb

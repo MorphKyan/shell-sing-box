@@ -162,7 +162,7 @@ $(cat "$filter_tmp")
     ],
     "final": "dns_proxy",
     "strategy": "prefer_ipv4",
-    "cache_capacity": 4096,
+    "cache_capacity": 1024,
     "reverse_mapping": true
   }
 }

@@ -75,7 +75,7 @@ ssb update   # 更新订阅
 
 - 服务：`/etc/init.d/shell-sing-box`
 - 交互工具：`/usr/sbin/ssb`
-- sing-box 运行时内核：`/tmp/shell-sing-box/bin/sing-box`
+- sing-box 运行时内核：`/etc/sing-box/bin/sing-box`
 - 运行时配置目录：`/tmp/shell-sing-box/config`
 - 订阅生成器主配置：`/etc/sing-box/generated/config.json`
 - 自定义环境变量：`/etc/sing-box/custom.env`

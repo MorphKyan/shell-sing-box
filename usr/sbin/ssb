@@ -9,7 +9,7 @@ show_menu() {
     echo "=========================================="
     
     # Check status
-    if pgrep -f "/tmp/shell-sing-box/bin/sing-box run" >/dev/null 2>&1 || pidof sing-box >/dev/null 2>&1; then
+    if pgrep -f "/etc/sing-box/bin/sing-box run" >/dev/null 2>&1 || pidof sing-box >/dev/null 2>&1; then
         status="\033[32m运行中\033[0m"
     else
         status="\033[31m未运行\033[0m"
