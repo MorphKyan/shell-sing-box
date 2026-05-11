@@ -48,6 +48,19 @@ export url='https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
   && sh /tmp/shell-sing-box-install.sh
 ```
 
+GitHub Mirror + `curl`：
+```sh
+export url='https://ghproxy.net/https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
+  && sh -c "$(curl -kfsSL $url/install.sh)"
+```
+
+GitHub Mirror + `wget`：
+```sh
+export url='https://ghproxy.net/https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
+  && wget --no-check-certificate -q -O /tmp/shell-sing-box-install.sh "$url/install.sh" \
+  && sh /tmp/shell-sing-box-install.sh
+```
+
 *注：安装脚本遵循最小化安装原则，只安装必要的硬依赖（`nft`, `ip`, `wget/curl`, `kmod-tun`）。*
 
 安装完成后，请将你的订阅生成器输出配置放入：`/etc/sing-box/generated/config.json`
