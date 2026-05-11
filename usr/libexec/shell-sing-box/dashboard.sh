@@ -2,8 +2,8 @@
 
 . /usr/libexec/shell-sing-box/common.sh
 
-ZASHBOARD_URL=${ZASHBOARD_URL:-https://testingcf.jsdelivr.net/gh/Zephyruso/zashboard@gh-pages/dist-cdn-fonts.zip}
-ZASHBOARD_ORIGIN_URL=${ZASHBOARD_ORIGIN_URL:-https://github.com/Zephyruso/zashboard/archive/refs/heads/gh-pages.zip}
+ZASHBOARD_URL=${ZASHBOARD_URL:-https://ghproxy.net/https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip}
+ZASHBOARD_ORIGIN_URL=${ZASHBOARD_ORIGIN_URL:-https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip}
 
 install_dashboard() {
     mkdirs
@@ -18,12 +18,12 @@ install_dashboard() {
     download "$tmp" "$ZASHBOARD_URL" || download "$tmp" "$ZASHBOARD_ORIGIN_URL" || die "failed to download Zashboard: $ZASHBOARD_URL"
     rm -rf "$UI_DIR"
     mkdir -p "$UI_DIR"
-    if command -v unzip >/dev/null 2>&1; then
-        unzip -oq "$tmp" -d "$UI_DIR"
-    elif command -v busybox >/dev/null 2>&1 && busybox unzip "$tmp" -d "$UI_DIR" >/dev/null 2>&1; then
+    if busybox unzip -oq "$tmp" -d "$UI_DIR" 2>/dev/null; then
+        :
+    elif unzip -oq "$tmp" -d "$UI_DIR" 2>/dev/null; then
         :
     else
-        die "missing unzip/busybox unzip"
+        die "failed to extract Zashboard archive (busybox unzip not available)"
     fi
 
     if [ ! -s "$UI_DIR/index.html" ]; then
@@ -43,7 +43,17 @@ install_dashboard() {
     log "Zashboard installed: $UI_DIR"
 }
 
+uninstall_dashboard() {
+    if [ -d "$UI_DIR" ]; then
+        rm -rf "$UI_DIR"
+        log "Zashboard uninstalled: $UI_DIR"
+    else
+        log "Zashboard not installed, nothing to do"
+    fi
+}
+
 case "$1" in
     install|"") install_dashboard ;;
+    uninstall) uninstall_dashboard ;;
     *) die "unknown dashboard command: $1" ;;
 esac

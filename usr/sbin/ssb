@@ -21,11 +21,12 @@ show_menu() {
     echo "  3. 配置订阅源/配置文件链接"
     echo "  4. 手动更新订阅和规则集"
     echo "  5. 安装/更新本地面板 (Zashboard)"
-    echo "  6. 设置自动更新定时任务"
-    echo "  7. 完全卸载 Shell-Sing-Box"
+    echo "  6. 卸载本地面板"
+    echo "  7. 设置自动更新定时任务"
+    echo "  8. 完全卸载 Shell-Sing-Box"
     echo "  0. 退出管理面板"
     echo "=========================================="
-    read -p " 请输入数字选项 [0-7]: " choice
+    read -p " 请输入数字选项 [0-8]: " choice
     echo ""
     
     case "$choice" in
@@ -71,9 +72,14 @@ show_menu() {
             /usr/libexec/shell-sing-box/task.sh update-dashboard
             ;;
         6)
-            set_cron
+            echo "正在卸载本地面板..."
+            /usr/libexec/shell-sing-box/dashboard.sh uninstall
+            echo "操作完成。"
             ;;
         7)
+            set_cron
+            ;;
+        8)
             uninstall_all
             ;;
         0)
@@ -177,7 +183,9 @@ if [ -n "$1" ]; then
         stop) /etc/init.d/shell-sing-box stop ;;
         restart) /etc/init.d/shell-sing-box restart ;;
         update) update_sub ;;
-        *) echo "Usage: $0 {start|stop|restart|update|menu}" ;;
+        install) /usr/libexec/shell-sing-box/task.sh update-dashboard ;;
+        uninstall-ui) /usr/libexec/shell-sing-box/dashboard.sh uninstall ;;
+        *) echo "Usage: $0 {start|stop|restart|update|install|uninstall-ui|menu}" ;;
     esac
 else
     show_menu
