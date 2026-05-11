@@ -1,6 +1,6 @@
 # shell-sing-box for ImmortalWrt
 
-这是一个面向 ImmortalWrt/OpenWrt ARM 路由器的轻量 sing-box 系统层，用来替代 ShellCrash 的“系统接管”部分。它不负责订阅转换，你仍然使用自己的订阅生成器输出 sing-box 配置。
+这是一个面向 ImmortalWrt/OpenWrt ARM 路由器的轻量 sing-box 系统层，用来替代 ShellCrash 的“系统接管”部分。它不负责订阅转换，你仍然需要使用自己的订阅生成器输出 sing-box 配置。
 
 ## 功能范围
 
@@ -10,54 +10,37 @@
 - 固定透明代理模式：TCP redir + sing-box tun。
 - 不支持 tproxy。
 - 支持 fake-ip + CN SRS 规则直连混合 DNS。
-- 支持 fake-ip 缓存。
-- 支持 fake-ip filter。
+- 支持 fake-ip 缓存与 filter。
 - 支持自动下载和更新 `.srs` 规则集。
 - 支持下载和配置 Zashboard 面板。
 - 默认阻止 WAN 访问透明代理端口和 API 端口。
-
-## 默认配置
-
-- 服务：`/etc/init.d/shell-sing-box`
-- sing-box 运行时内核：`/tmp/shell-sing-box/bin/sing-box`
-- 订阅生成器输出：`/etc/sing-box/generated/config.json`
-- 运行时配置目录：`/tmp/shell-sing-box/config`
-- TCP redir 入站端口：`9998`
-- DNS 劫持入站端口：`1053`
-- Clash API / Zashboard 端口：`9999`
-- nftables 表：`table inet singbox`
-- SRS 缓存目录：`/etc/sing-box/ruleset`
-- 面板目录：`/etc/sing-box/ui`
-- TUN 接口：`sbtun0`
-- fake-ip IPv4 地址段：`28.0.0.0/8`
+- 提供 `ssb` 交互式命令行管理工具。
 
 ## 安装
 
-支持类似 ShellCrash 的命令安装方式：
+支持一键命令安装：
 
 ```sh
-export url='https://testingcf.jsdelivr.net/gh/<owner>/<repo>@<branch>/shell-sing-box' \
+export url='https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@main' \
   && sh -c "$(curl -kfsSL $url/install.sh)"
 ```
 
 如果设备没有 `curl`，使用 `wget`：
 
 ```sh
-export url='https://testingcf.jsdelivr.net/gh/<owner>/<repo>@<branch>/shell-sing-box' \
+export url='https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@main' \
   && wget --no-check-certificate -q -O /tmp/shell-sing-box-install.sh "$url/install.sh" \
   && sh /tmp/shell-sing-box-install.sh
 ```
 
-如果你的仓库根目录就是 `shell-sing-box`，则 `url` 末尾不需要加 `/shell-sing-box`。
-
-GitHub raw 安装命令，适合 jsDelivr 缓存还没刷新时使用：
+如果 jsDelivr 缓存未刷新，可以换用 GitHub Raw 源：
 
 ```sh
 export url='https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
   && sh -c "$(curl -kfsSL $url/install.sh)"
 ```
 
-GitHub raw + `wget`：
+GitHub Raw + `wget`：
 
 ```sh
 export url='https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
@@ -65,413 +48,68 @@ export url='https://raw.githubusercontent.com/MorphKyan/shell-sing-box/main' \
   && sh /tmp/shell-sing-box-install.sh
 ```
 
-把整个 `shell-sing-box` 目录复制到路由器，然后执行：
+*注：安装脚本遵循最小化安装原则，只安装必要的硬依赖（`nft`, `ip`, `wget/curl`, `kmod-tun`）。*
 
-```sh
-chmod +x install.sh
-./install.sh
-```
-
-安装脚本会：
-
-- 只安装缺失的硬依赖，不安装非必要包。
-- 不通过 `opkg` 安装 sing-box。
-- 从本项目 `update` 分支下载预打包 sing-box 内核，并解压到 `/tmp/shell-sing-box/bin/sing-box`。
-- 复制服务、脚本和默认配置。
-- 启用 `/etc/init.d/shell-sing-box`。
-
-这遵循 ShellCrash 的思路：少安装东西，能用系统已有工具就不额外安装。安装脚本不会主动安装 `curl`、`libcurl`、`libnghttp2`、`unzip`、证书包等非必要组件。
-
-硬依赖：
-
-- `nft`
-- `ip`
-- `wget` 或 `curl`
-- TUN 内核支持
-
-如果缺失且系统存在 `opkg`，只会尝试安装对应最小包：
-
-```text
-nftables ip-full wget-ssl kmod-tun
-```
-
-脚本默认认为固件已有 BusyBox 基础工具，例如 `sh`、`tar`、`gzip`、`awk`、`sed`、`grep`、`find`。
-
-然后把你的订阅生成器输出放到：
-
-```sh
-/etc/sing-box/generated/config.json
-```
-
-启动服务：
-
-```sh
-/etc/init.d/shell-sing-box start
-```
-
-## 国内镜像源优先
-
-默认配置优先使用国内可访问性更好的镜像或代理：
-
-- sing-box core：优先本项目 `update` 分支的 GitHub raw 镜像包
-- SRS：优先 `https://testingcf.jsdelivr.net/gh/...`
-- Zashboard：优先 jsDelivr 镜像
-
-core 默认只下载项目内包；如果需要回退到上游 release，需要手动设置 `CORE_ALLOW_RELEASE_FALLBACK=1`。
-
-相关配置在：
-
-```sh
-/etc/sing-box/custom.env
-```
-
-主要字段：
-
-```sh
-CORE_VERSION=v1.13.11
-CORE_ARCH=auto
-CORE_REPO_BASE=https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box
-CORE_REPO_RAW_BASE=https://ghproxy.net/https://raw.githubusercontent.com/MorphKyan/shell-sing-box
-CORE_REPO_ORIGIN_RAW_BASE=https://raw.githubusercontent.com/MorphKyan/shell-sing-box
-CORE_REPO_BRANCH=update
-CORE_REPO_PATH=bin/sing-box
-GITHUB_PROXY_PREFIX=https://gh.llkk.cc/
-CORE_DOWNLOAD_PREFIX=https://gh.llkk.cc/
-CORE_ALLOW_RELEASE_FALLBACK=0
-MIRROR_PREFIX=https://testingcf.jsdelivr.net/gh/
-```
-
-## sing-box 内核
-
-默认固定到当前预打包的稳定版：
-
-```sh
-CORE_VERSION=v1.13.11
-```
-
-这和 ShellCrash 的预打包方式一致：配置里的版本必须能在 `update` 分支 `bin/sing-box/` 目录找到对应压缩包。你也可以设为 `latest`，但需要同步上传对应版本的包，否则默认不会回退到上游 release。
-
-如果你想固定版本，例如：
-
-```sh
-CORE_VERSION=v1.12.0
-```
-
-架构默认自动识别：
-
-```sh
-CORE_ARCH=auto
-```
-
-普通 Linux 会根据 `uname -m` 映射到 sing-box release 包名，例如 `arm64`、`armv7`、`armv6`、`armv5`。
-
-在 OpenWrt/ImmortalWrt 上会读取 `/etc/openwrt_release` 里的 `DISTRIB_ARCH`，例如你的 `aarch64_cortex-a53` 设备会使用从官方 OpenWrt ipk 提取出来的包：
-
-```text
-sing-box-1.13.11-openwrt-aarch64_cortex-a53.tar.gz
-```
-
-core 下载方式改成 ShellCrash 风格：把内核压缩包预先放到本项目 `update` 分支的 `bin/` 目录，安装时只下载项目内文件。
-
-默认下载优先级：
-
-1. GitHub raw 镜像项目内包：
-   `https://ghproxy.net/https://raw.githubusercontent.com/MorphKyan/shell-sing-box/update/bin/sing-box/<asset>`
-2. jsDelivr 项目内包：
-   `https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@update/bin/sing-box/<asset>`
-3. GitHub raw 项目内包：
-   `https://raw.githubusercontent.com/MorphKyan/shell-sing-box/update/bin/sing-box/<asset>`
-4. 只有显式设置 `CORE_ALLOW_RELEASE_FALLBACK=1` 时，才回退到上游 release
-
-```text
-https://ghproxy.net/https://raw.githubusercontent.com/MorphKyan/shell-sing-box/update/bin/sing-box/sing-box-1.13.11-openwrt-aarch64_cortex-a53.tar.gz
-```
-
-jsDelivr 项目内包也会作为后备源尝试：
-
-```text
-https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@update/bin/sing-box/sing-box-1.13.11-openwrt-aarch64_cortex-a53.tar.gz
-```
-
-也就是说，默认不再实时下载 GitHub Release 附件。要更新内核，从官方 OpenWrt `.ipk` 里提取 `/usr/bin/sing-box`，重新打成 tar.gz 后上传到 `update` 分支的 `bin/sing-box/` 目录即可。下载后会解压到 `/tmp/shell-sing-box/bin/sing-box`，并用 `sing-box version` 检查安装后的二进制。
-
-注意：官方 OpenWrt sing-box 解压后超过 60MB，很多路由器 overlay 放不下，所以默认把运行时二进制放在 tmpfs。重启后如果 tmpfs 被清空，`prepare.sh` 会在启动前重新下载并解压。
-
-手动更新 core：
-
-```sh
-/usr/libexec/shell-sing-box/core-install.sh
-/etc/init.d/shell-sing-box restart
-```
-
-或者：
-
-```sh
-/usr/libexec/shell-sing-box/task.sh update-core
-```
-
-## GitHub Actions 编译内核
-
-仓库包含 `.github/workflows/build-core.yml`，用于编译精简 sing-box core。
-
-当前构建标签：
-
-```text
-with_quic,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0
-```
-
-保留 QUIC/uTLS/Clash API，去掉 gVisor、WireGuard、Tailscale、NaiveProxy、ACME、DHCP 等非必要功能。手动运行 workflow 时可以选择是否发布到 `update` 分支。
-
-workflow 会注入 `github.com/sagernet/sing-box/constant.Version`，所以 `sing-box version` 会显示选择的版本号，而不是 `unknown`。
-
-## 配置生成方式
-
-你的订阅生成器负责输出主配置：
-
-```sh
-/etc/sing-box/generated/config.json
-```
-
-`shell-sing-box` 启动时会复制它到运行时目录：
-
-```sh
-/tmp/shell-sing-box/config/00-generated.json
-```
-
-然后自动追加系统配置片段：
-
-- DNS / fake-ip 配置
-- TCP redirect 入站：`9998`
-- DNS 入站：`1053`
-- TUN 入站：`sbtun0`
-- Clash API：`9999`
-- fake-ip cache
-- 必要的 `DIRECT` / `GLOBAL` 出站补齐
-- CN SRS 规则补齐
-
-最后执行：
-
-```sh
-sing-box check -D /etc/sing-box -C /tmp/shell-sing-box/config
-```
-
-校验成功后才启动服务并写入 nftables 规则。
-
-## DNS 与 fake-ip
-
-默认 DNS 模式是 fake-ip + CN SRS 直连混合：
-
-- CN rule-set 命中：走 `dns_direct`
-- 非 CN：返回 fake-ip，并由透明代理处理
-- fake-ip 缓存开启
-- reverse mapping 开启
-
-默认 DNS：
-
-```sh
-DNS_DIRECT=223.5.5.5
-DNS_PROXY=https://cloudflare-dns.com/dns-query
-DNS_RESOLVER=223.5.5.5
-```
-
-fake-ip filter 文件：
-
-```sh
-/etc/sing-box/fake_ip_filter.list
-```
-
-可以写入不希望返回 fake-ip 的域名，例如：
-
-```text
-*.lan
-*.local
-time.android.com
-pool.ntp.org
-```
-
-## SRS 下载与更新
-
-系统会扫描运行时 sing-box 配置里的 remote `.srs` rule-set。
-
-如果 rule-set 已经有 `path`，就下载到该路径。
-
-如果没有 `path`，启动时会在运行时配置里自动注入：
-
-```sh
-/etc/sing-box/ruleset/<文件名>.srs
-```
-
-建议你的生成器输出类似：
-
-```json
-{
-  "type": "remote",
-  "tag": "cn",
-  "format": "binary",
-  "path": "/etc/sing-box/ruleset/cn.srs",
-  "url": "https://raw.githubusercontent.com/DustinWin/ruleset_geodata/sing-box-ruleset/cn.srs",
-  "download_detour": "DIRECT"
-}
-```
-
-手动更新 SRS：
-
-```sh
-/usr/libexec/shell-sing-box/task.sh update-srs
-```
-
-示例 cron：
-
-```sh
-0 4 * * * /usr/libexec/shell-sing-box/task.sh update-srs
-```
-
-如果下载失败但本地已有缓存，服务会继续使用旧缓存，不会因为网络问题直接中断启动。
-
-## Zashboard
-
-安装或刷新 Zashboard：
-
-```sh
-/usr/libexec/shell-sing-box/task.sh update-dashboard
-```
-
-面板解压会优先使用系统已有的 `unzip` 或 `busybox unzip`。如果两者都没有，可以手动把 Zashboard 放到 `/etc/sing-box/ui`，或者自行安装 `unzip`。
-
-访问地址：
-
-```text
-http://<路由器LAN IP>:9999/ui
-```
-
-API 配置：
-
-```sh
-API_PORT=9999
-API_SECRET=
-```
-
-如果你设置了 `API_SECRET`，面板连接时也需要填写对应 secret。
-
-## nftables 透明代理
-
-启动后会创建独立表：
-
-```sh
-table inet singbox
-```
-
-规则行为：
-
-- LAN TCP 流量 redirect 到 `9998`
-- LAN UDP 流量打 mark 后走 `sbtun0`
-- LAN DNS `tcp/udp 53` redirect 到 `1053`
-- 排除保留地址和局域网本地地址
-- 排除 sing-box 自身 mark，避免回环
-- 允许 LAN 访问 API
-- 阻止 WAN 访问 `9998`、`9999`、`1053`
-
-停止服务时会删除整张 `table inet singbox`，并清理策略路由。
+安装完成后，请将你的订阅生成器输出配置放入：`/etc/sing-box/generated/config.json`
 
 ## 常用命令
 
-**最新加入：交互式管理面板 `ssb`**
-
-我们添加了与 ShellCrash 类似的交互式菜单，你可以在终端输入 `ssb` 快速打开配置面板，进行启动、停止、配置订阅、安装面板、设置定时任务等操作：
+我们提供了一个与 ShellCrash 类似的交互式管理面板 `ssb`，你可以在终端输入 `ssb` 快速打开配置面板，进行启动、停止、配置订阅、安装面板、设置定时任务等操作：
 
 ```sh
 ssb
 ```
 
-或者使用 `ssb` 后接指令快速执行：
+也可以使用带参数的 `ssb` 命令快速执行对应操作：
 
 ```sh
-ssb start    # 启动
-ssb stop     # 停止
-ssb restart  # 重启
+ssb start    # 启动服务
+ssb stop     # 停止服务
+ssb restart  # 重启服务
 ssb update   # 更新订阅
 ```
 
-如果你希望使用传统的 init.d 脚本或 task.sh 工具进行操作：
+系统服务同样支持传统的 `init.d` 脚本命令：`/etc/init.d/shell-sing-box start|stop|restart|enable`
 
-启动：
+## 默认配置与目录结构
 
-```sh
-/etc/init.d/shell-sing-box start
-```
+- 服务：`/etc/init.d/shell-sing-box`
+- 交互工具：`/usr/sbin/ssb`
+- sing-box 运行时内核：`/tmp/shell-sing-box/bin/sing-box`
+- 运行时配置目录：`/tmp/shell-sing-box/config`
+- 订阅生成器主配置：`/etc/sing-box/generated/config.json`
+- 自定义环境变量：`/etc/sing-box/custom.env`
+- SRS 缓存目录：`/etc/sing-box/ruleset`
+- Zashboard 面板目录：`/etc/sing-box/ui`
+- TCP redir 入站端口：`9998`
+- DNS 劫持入站端口：`1053`
+- Clash API / Zashboard 端口：`9999`
+- nftables 表：`table inet singbox`
+- TUN 接口：`sbtun0`
+- fake-ip IPv4 地址段：`28.0.0.0/8`
+- fake-ip filter 列表：`/etc/sing-box/fake_ip_filter.list`
 
-停止：
+## 运行机制与核心功能
 
-```sh
-/etc/init.d/shell-sing-box stop
-```
+### 配置生成
+`shell-sing-box` 启动时会将主配置复制到运行时目录，并自动追加系统配置片段（如 DNS、入站、Clash API、fake-ip 等），随后自动验证配置，校验成功才会写入 nftables 规则启动服务。
+*注意：如果生成器配置已存在同名 DNS 或入站定义，可能会与系统层追加配置冲突。*
 
-重启：
+### 内核与镜像下载
+系统默认优先使用国内可访问性较好的镜像源（如 jsDelivr, ghproxy）。你可以在 `/etc/sing-box/custom.env` 中自定义版本及镜像配置（如 `CORE_VERSION`、`CORE_ARCH` 等）。
+- **内核版本**：自动识别系统架构并优先下载本项目 `update` 分支预打包的精简核心（默认固定为当前预打包稳定版）。项目默认使用 GitHub Actions 编译精简内核，移除了 gVisor、WireGuard 等非必要功能，以适配路由器存储限制。你可以在 `ssb` 菜单中更新内核。
+- **SRS 规则集**：系统会自动扫描配置中的 remote `.srs`，自动下载至本地进行缓存。如果下载失败将继续使用已有旧缓存。
+- **Zashboard 面板**：可通过 `ssb` 安装。安装后访问地址为：`http://<路由器LAN IP>:9999/ui`。
 
-```sh
-/etc/init.d/shell-sing-box restart
-```
+### DNS 与 fake-ip
+默认 DNS 模式为 fake-ip + CN SRS 直连混合。命中 CN rule-set 的流量直连，其余流量透明代理。默认开启 fake-ip 缓存及逆向解析。如果不希望特定域名返回 fake-ip，可以将其加入 `/etc/sing-box/fake_ip_filter.list`（如 `*.lan`, `pool.ntp.org`）。
 
-开机自启：
-
-```sh
-/etc/init.d/shell-sing-box enable
-```
-
-检查配置：
-
-```sh
-/usr/libexec/shell-sing-box/task.sh check
-```
-
-更新 SRS：
-
-```sh
-/usr/libexec/shell-sing-box/task.sh update-srs
-```
-
-更新 core：
-
-```sh
-/usr/libexec/shell-sing-box/task.sh update-core
-```
-
-安装/更新 Zashboard：
-
-```sh
-/usr/libexec/shell-sing-box/task.sh update-dashboard
-```
-
-## 目录结构
-
-```text
-/etc/sing-box/
-  custom.env
-  fake_ip_filter.list
-  generated/config.json
-  ruleset/
-  ui/
-  bin/sing-box
-
-/tmp/shell-sing-box/
-  config/
-
-/usr/libexec/shell-sing-box/
-  common.sh
-  core-install.sh
-  dashboard.sh
-  firewall.sh
-  generate-system-config.sh
-  prepare.sh
-  srs-update.sh
-  task.sh
-```
+### nftables 透明代理
+服务启动时会创建 `table inet singbox` 独立表，实现局域网 TCP 流量重定向至 9998，UDP 流量标记后路由至 `sbtun0`，DNS 劫持至 1053。默认放行局域网访问 API，但阻止 WAN 访问代理和 API 端口。停止服务时自动删除该表并清理策略路由。
 
 ## 注意事项
 
-- 这个项目不支持 mihomo/clash 内核。
-- 不支持 tproxy。
-- 不维护 iptables 后端。
+- 本项目不支持 mihomo/clash 内核。
+- 不支持 tproxy 模式和 iptables 后端。
 - 不暴露 mixed HTTP/SOCKS 代理端口。
 - IPv6 默认关闭，可通过 `ENABLE_IPV6=1` 开启实验性支持。
-- 如果你的生成器已经定义了同名 DNS、入站或 experimental 配置，可能需要调整生成器输出，避免和系统层追加配置冲突。

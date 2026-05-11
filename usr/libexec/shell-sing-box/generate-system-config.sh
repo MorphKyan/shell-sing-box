@@ -16,7 +16,7 @@ filter_rules() {
         [ -z "$line" ] && continue
         case "$line" in
             *'*'*)
-                regex=$(printf '%s' "$line" | sed 's/\./\\./g;s/\*/.*/g;s/^+/.+/')
+                regex=$(printf '%s' "$line" | sed 's/\./\\\\./g;s/\*/.*/g;s/^+/.+/')
                 regex_items="${regex_items}${regex_items:+, }\"$regex\""
                 ;;
             +.*|.*)
@@ -76,17 +76,8 @@ normalize_generated_rulesets() {
             return parts[n]
         }
         function flush_remote(close_line, i, last) {
-            if (url ~ /\.srs([?#].*)?$/ && path == "") {
-                last = n
-                while (last > 0 && buf[last] ~ /^[[:space:]]*$/) last--
-                if (last > 0 && buf[last] !~ /,[[:space:]]*$/) buf[last] = buf[last] ","
-                for (i = 1; i <= n; i++) print buf[i]
-                print "        \"path\": \"" ruleset_dir "/" basename(url) "\""
-                print close_line
-            } else {
-                for (i = 1; i <= n; i++) print buf[i]
-                print close_line
-            }
+            for (i = 1; i <= n; i++) print buf[i]
+            print close_line
             remote=0; n=0; url=""; path=""
         }
         remote {
@@ -134,9 +125,7 @@ generate_cn_ruleset() {
         "type": "remote",
         "tag": "$CN_RULESET_TAG",
         "format": "binary",
-        "path": "$RULESET_DIR/$CN_RULESET_TAG.srs",
-        "url": "https://raw.githubusercontent.com/DustinWin/ruleset_geodata/sing-box-ruleset/cn.srs",
-        "download_detour": "DIRECT"
+        "url": "https://raw.githubusercontent.com/DustinWin/ruleset_geodata/sing-box-ruleset/cn.srs"
       }
     ]
   }
@@ -166,7 +155,7 @@ $(printf '%s,\n' "$resolver_server")
       }
     ],
     "rules": [
-      { "clash_mode": "Direct", "server": "dns_direct", "strategy": "prefer_ipv4" },
+      { "clash_mode": "direct", "server": "dns_direct", "strategy": "prefer_ipv4" },
 $(cat "$filter_tmp")
       { "rule_set": ["$CN_RULESET_TAG"], "server": "dns_direct", "strategy": "prefer_ipv4" },
       { "query_type": ["A", "AAAA"], "server": "dns_fakeip", "strategy": "prefer_ipv4", "rewrite_ttl": 1 }
@@ -174,7 +163,6 @@ $(cat "$filter_tmp")
     "final": "dns_proxy",
     "strategy": "prefer_ipv4",
     "cache_capacity": 4096,
-    "optimistic": { "enabled": true, "timeout": "3d" },
     "reverse_mapping": true
   }
 }
@@ -249,8 +237,8 @@ generate_route() {
     "default_domain_resolver": "dns_resolver",
     "rules": [
       { "inbound": ["dns-in"], "action": "hijack-dns" },
-      { "clash_mode": "Direct", "outbound": "DIRECT" },
-      { "clash_mode": "Global", "outbound": "GLOBAL" }
+      { "clash_mode": "direct", "outbound": "DIRECT" },
+      { "clash_mode": "global", "outbound": "GLOBAL" }
     ]
   }
 }
@@ -271,7 +259,7 @@ generate_experimental() {
       "external_controller": "0.0.0.0:$API_PORT",
       "external_ui": "$UI_DIR",
       "secret": "$API_SECRET",
-      "default_mode": "Rule"
+      "default_mode": "rule"
     }
   }
 }
