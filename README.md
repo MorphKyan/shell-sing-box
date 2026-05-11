@@ -73,6 +73,25 @@ Start the service:
 /etc/init.d/shell-sing-box start
 ```
 
+## Management CLI
+
+We provide an interactive `ssb` management interface similar to ShellCrash. Simply run:
+
+```sh
+ssb
+```
+
+to start/stop the service, configure subscriptions, install dashboards, and set cron jobs interactively.
+
+You can also use direct commands:
+
+```sh
+ssb start    # Start service
+ssb stop     # Stop service
+ssb restart  # Restart service
+ssb update   # Update subscription
+```
+
 ## Configuration
 
 Edit `/etc/sing-box/custom.env`.

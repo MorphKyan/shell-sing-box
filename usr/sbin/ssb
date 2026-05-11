@@ -1,0 +1,184 @@
+#!/bin/sh
+
+[ -f /usr/libexec/shell-sing-box/common.sh ] && . /usr/libexec/shell-sing-box/common.sh
+
+show_menu() {
+    clear
+    echo "=========================================="
+    echo "          Shell-Sing-Box 管理面板         "
+    echo "=========================================="
+    
+    # Check status
+    if pgrep -f "/tmp/shell-sing-box/bin/sing-box run" >/dev/null 2>&1 || pidof sing-box >/dev/null 2>&1; then
+        status="\033[32m运行中\033[0m"
+    else
+        status="\033[31m未运行\033[0m"
+    fi
+    echo -e " 服务状态: $status"
+    echo "=========================================="
+    echo "  1. 启动/重启服务 (Start/Restart)"
+    echo "  2. 停止服务 (Stop)"
+    echo "  3. 配置订阅源/配置文件链接"
+    echo "  4. 手动更新订阅和规则集"
+    echo "  5. 安装/更新本地面板 (Zashboard)"
+    echo "  6. 设置自动更新定时任务"
+    echo "  7. 完全卸载 Shell-Sing-Box"
+    echo "  0. 退出管理面板"
+    echo "=========================================="
+    read -p " 请输入数字选项 [0-7]: " choice
+    echo ""
+    
+    case "$choice" in
+        1)
+            echo "正在启动/重启服务..."
+            /etc/init.d/shell-sing-box restart
+            echo "操作完成。"
+            ;;
+        2)
+            echo "正在停止服务..."
+            /etc/init.d/shell-sing-box stop
+            echo "服务已停止。"
+            ;;
+        3)
+            echo "当前订阅源链接: ${SUB_URL:-未设置}"
+            read -p "请输入新的 sing-box 配置/订阅链接 (留空取消): " input_url
+            if [ -n "$input_url" ]; then
+                # Remove existing SUB_URL
+                if [ -f "$ENV_FILE" ]; then
+                    sed -i '/^SUB_URL=/d' "$ENV_FILE"
+                else
+                    mkdir -p "$(dirname "$ENV_FILE")"
+                fi
+                echo "SUB_URL=\"$input_url\"" >> "$ENV_FILE"
+                
+                # reload custom.env
+                . "$ENV_FILE"
+                echo "订阅源链接已保存。"
+                
+                read -p "是否立即下载并更新？(y/n): " update_now
+                if [ "$update_now" = "y" ] || [ "$update_now" = "Y" ]; then
+                    update_sub
+                fi
+            else
+                echo "操作已取消。"
+            fi
+            ;;
+        4)
+            update_sub
+            ;;
+        5)
+            echo "正在安装/更新本地面板..."
+            /usr/libexec/shell-sing-box/task.sh update-dashboard
+            ;;
+        6)
+            set_cron
+            ;;
+        7)
+            uninstall_all
+            ;;
+        0)
+            echo "退出面板。"
+            exit 0
+            ;;
+        *)
+            echo "输入无效，请重新输入。"
+            ;;
+    esac
+    
+    echo ""
+    read -p "按回车键返回主菜单..."
+    show_menu
+}
+
+update_sub() {
+    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+    if [ -n "$SUB_URL" ]; then
+        echo "正在从订阅源下载配置..."
+        mkdir -p "$(dirname "$CONFIG_SOURCE_FILE")"
+        if download "$CONFIG_SOURCE_FILE" "$SUB_URL"; then
+            echo "配置下载成功！"
+            echo "正在重载配置和规则集..."
+            /usr/libexec/shell-sing-box/task.sh update-srs
+            echo "更新完成！"
+        else
+            echo "配置下载失败，请检查网络或链接。"
+        fi
+    else
+        echo "未配置订阅源链接，请先在菜单 [3] 中进行配置。"
+    fi
+}
+
+set_cron() {
+    echo "=========================================="
+    echo "               定时任务设置               "
+    echo "=========================================="
+    echo "  1. 每天凌晨 4 点自动更新订阅和规则"
+    echo "  2. 每周一凌晨 4 点自动更新订阅和规则"
+    echo "  3. 清除所有相关定时任务"
+    echo "  0. 返回主菜单"
+    echo "=========================================="
+    read -p " 请选择 [0-3]: " cron_choice
+    
+    case "$cron_choice" in
+        1)
+            sed -i '/shell-sing-box\/task.sh update-srs/d' /etc/crontabs/root 2>/dev/null || true
+            echo "0 4 * * * /usr/libexec/shell-sing-box/task.sh update-srs >/dev/null 2>&1" >> /etc/crontabs/root
+            /etc/init.d/cron restart 2>/dev/null || true
+            echo "定时任务已设置为每天凌晨 4 点。"
+            ;;
+        2)
+            sed -i '/shell-sing-box\/task.sh update-srs/d' /etc/crontabs/root 2>/dev/null || true
+            echo "0 4 * * 1 /usr/libexec/shell-sing-box/task.sh update-srs >/dev/null 2>&1" >> /etc/crontabs/root
+            /etc/init.d/cron restart 2>/dev/null || true
+            echo "定时任务已设置为每周一凌晨 4 点。"
+            ;;
+        3)
+            sed -i '/shell-sing-box\/task.sh update-srs/d' /etc/crontabs/root 2>/dev/null || true
+            /etc/init.d/cron restart 2>/dev/null || true
+            echo "已清除所有相关的定时任务。"
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo "输入无效。"
+            ;;
+    esac
+}
+
+uninstall_all() {
+    read -p "警告: 此操作将完全卸载 Shell-Sing-Box 并删除所有配置。是否确认？(y/n): " confirm
+    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+        echo "正在停止服务..."
+        /etc/init.d/shell-sing-box stop 2>/dev/null || true
+        /etc/init.d/shell-sing-box disable 2>/dev/null || true
+        
+        echo "正在清理文件和目录..."
+        rm -rf /usr/libexec/shell-sing-box
+        rm -rf /etc/sing-box
+        rm -rf /tmp/shell-sing-box
+        rm -f /etc/init.d/shell-sing-box
+        rm -f /usr/sbin/ssb
+        rm -f /usr/bin/ssb
+        
+        echo "正在清理定时任务..."
+        sed -i '/shell-sing-box/d' /etc/crontabs/root 2>/dev/null || true
+        /etc/init.d/cron restart 2>/dev/null || true
+        
+        echo "卸载完成！"
+        exit 0
+    fi
+}
+
+# Main
+if [ -n "$1" ]; then
+    case "$1" in
+        start) /etc/init.d/shell-sing-box start ;;
+        stop) /etc/init.d/shell-sing-box stop ;;
+        restart) /etc/init.d/shell-sing-box restart ;;
+        update) update_sub ;;
+        *) echo "Usage: $0 {start|stop|restart|update|menu}" ;;
+    esac
+else
+    show_menu
+fi

@@ -2,7 +2,7 @@
 
 set -e
 
-PROJECT_FILES="README.md README_CN.md etc/init.d/shell-sing-box etc/sing-box/custom.env etc/sing-box/fake_ip_filter.list usr/libexec/shell-sing-box/common.sh usr/libexec/shell-sing-box/core-install.sh usr/libexec/shell-sing-box/dashboard.sh usr/libexec/shell-sing-box/firewall.sh usr/libexec/shell-sing-box/generate-system-config.sh usr/libexec/shell-sing-box/prepare.sh usr/libexec/shell-sing-box/srs-update.sh usr/libexec/shell-sing-box/task.sh"
+PROJECT_FILES="README.md README_CN.md etc/init.d/shell-sing-box etc/sing-box/custom.env etc/sing-box/fake_ip_filter.list usr/libexec/shell-sing-box/common.sh usr/libexec/shell-sing-box/core-install.sh usr/libexec/shell-sing-box/dashboard.sh usr/libexec/shell-sing-box/firewall.sh usr/libexec/shell-sing-box/generate-system-config.sh usr/libexec/shell-sing-box/prepare.sh usr/libexec/shell-sing-box/srs-update.sh usr/libexec/shell-sing-box/task.sh usr/sbin/ssb"
 SRC_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 copy_tree() {
@@ -74,6 +74,7 @@ main() {
     mkdir -p /etc/sing-box/generated /etc/sing-box/ruleset /etc/sing-box/ui /tmp/shell-sing-box
     chmod 755 /etc/init.d/shell-sing-box
     chmod 755 /usr/libexec/shell-sing-box/*.sh
+    chmod 755 /usr/sbin/ssb
     /usr/libexec/shell-sing-box/core-install.sh
 
     if [ ! -f /etc/sing-box/generated/config.json ]; then

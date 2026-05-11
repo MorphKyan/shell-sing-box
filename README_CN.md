@@ -375,6 +375,25 @@ table inet singbox
 
 ## 常用命令
 
+**最新加入：交互式管理面板 `ssb`**
+
+我们添加了与 ShellCrash 类似的交互式菜单，你可以在终端输入 `ssb` 快速打开配置面板，进行启动、停止、配置订阅、安装面板、设置定时任务等操作：
+
+```sh
+ssb
+```
+
+或者使用 `ssb` 后接指令快速执行：
+
+```sh
+ssb start    # 启动
+ssb stop     # 停止
+ssb restart  # 重启
+ssb update   # 更新订阅
+```
+
+如果你希望使用传统的 init.d 脚本或 task.sh 工具进行操作：
+
 启动：
 
 ```sh
