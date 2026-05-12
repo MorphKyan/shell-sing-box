@@ -40,11 +40,11 @@ fetch_file() {
     out=$2
     mkdir -p "$(dirname "$out")"
     if command -v curl >/dev/null 2>&1; then
-        curl -kfsSL -o "$out" "$remote"
+        curl -kfsSL -o "$out" "$remote" || return 1
     elif command -v wget >/dev/null 2>&1; then
-        wget --no-check-certificate -q -O "$out" "$remote"
+        wget --no-check-certificate -q -O "$out" "$remote" || return 1
     else
-        echo "missing curl/wget"
+        echo "ERROR: missing curl/wget"
         exit 1
     fi
 }
@@ -60,7 +60,14 @@ bootstrap_remote() {
     mkdir -p "$tmp"
     echo "Downloading shell-sing-box installer files from: $url"
     for file in $PROJECT_FILES; do
-        fetch_file "$url/$file" "$tmp/$file"
+        printf "  fetching %s... " "$file"
+        if fetch_file "$url/$file" "$tmp/$file"; then
+            echo "done."
+        else
+            echo "FAILED!"
+            echo "ERROR: Failed to download $file from $url"
+            exit 1
+        fi
     done
     SRC_DIR="$tmp"
 }
