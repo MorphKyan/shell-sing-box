@@ -43,7 +43,6 @@ dns_server_json() {
     
     props=""
     [ -n "$detour" ] && props="${props}, \"detour\": \"$detour\""
-    [ -n "$ecs" ] && props="${props}, \"client_subnet\": \"$ecs\""
 
     case "$value" in
         https://*)
@@ -186,31 +185,23 @@ generate_dns() {
         list=$2
         detour=$3
         ecs=$4
-        members=""
-        count=0
         
+        count=0
         OLD_IFS=$IFS; IFS=','
         for s in $list; do
             [ -z "$s" ] && continue
             count=$((count+1))
-            tag="${base_tag}_$count"
+            # Use base_tag for the first server so rules can reference it
+            if [ $count -eq 1 ]; then
+                tag="$base_tag"
+            else
+                tag="${base_tag}_$count"
+            fi
             obj=$(dns_server_json "$tag" "$s" "$detour" "$ecs")
             servers_json="${servers_json},
 ${obj}"
-            [ -n "$members" ] && members="${members}, "
-            members="${members}\"$tag\""
         done
         IFS=$OLD_IFS
-        
-        if [ $count -gt 1 ]; then
-            servers_json="${servers_json},
-      { \"type\": \"group\", \"tag\": \"$base_tag\", \"servers\": [${members}] }"
-        elif [ $count -eq 1 ]; then
-            # Single member, just alias it with a group or use the member tag?
-            # For simplicity, we always create the group tag to keep references consistent
-            servers_json="${servers_json},
-      { \"type\": \"group\", \"tag\": \"$base_tag\", \"servers\": [${members}] }"
-        fi
     }
 
     build_group "dns_resolver" "$DNS_RESOLVER" "" ""
@@ -229,6 +220,9 @@ ${obj}"
     filter_tmp="$RUNTIME_DIR/fakeip-rules.json"
     filter_rules > "$filter_tmp"
 
+    ecs_json=""
+    [ -n "$ecs_to_use" ] && ecs_json=", \"client_subnet\": \"$ecs_to_use\""
+
     cat > "$CONFIG_RUNTIME_DIR/30-dns.json" <<EOF
 {
   "dns": {
@@ -244,7 +238,7 @@ $(cat "$filter_tmp")
     "final": "dns_proxy",
     "strategy": "prefer_ipv4",
     "cache_capacity": 1024,
-    "reverse_mapping": true
+    "reverse_mapping": true${ecs_json}
   }
 }
 EOF
