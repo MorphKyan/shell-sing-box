@@ -37,30 +37,42 @@ filter_rules() {
 
 dns_server_json() {
     tag=$1
-    value=$(printf '%s' "$2" | cut -d',' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    value=$2
+    detour=$3
+    ecs=$4
+    
+    props=""
+    [ -n "$detour" ] && props="${props}, \"detour\": \"$detour\""
+    [ -n "$ecs" ] && props="${props}, \"client_subnet\": \"$ecs\""
+
     case "$value" in
         https://*)
             server=${value#https://}
             server=${server%%/*}
-            printf '      { "type": "https", "tag": "%s", "server": "%s", "domain_resolver": "dns_resolver" }' "$tag" "$server"
+            printf '      { "type": "https", "tag": "%s", "server": "%s", "domain_resolver": "dns_hosts"%s }' "$tag" "$server" "$props"
+            ;;
+        quic://*)
+            server=${value#quic://}
+            server=${server%%/*}
+            printf '      { "type": "quic", "tag": "%s", "server": "%s", "domain_resolver": "dns_hosts"%s }' "$tag" "$server" "$props"
             ;;
         tls://*)
             server=${value#tls://}
             server=${server%%/*}
-            printf '      { "type": "tls", "tag": "%s", "server": "%s", "server_port": 853, "domain_resolver": "dns_resolver" }' "$tag" "$server"
+            printf '      { "type": "tls", "tag": "%s", "server": "%s", "server_port": 853, "domain_resolver": "dns_hosts"%s }' "$tag" "$server" "$props"
             ;;
         tcp://*)
             server=${value#tcp://}
             server=${server%%/*}
-            printf '      { "type": "tcp", "tag": "%s", "server": "%s", "server_port": 53 }' "$tag" "$server"
+            printf '      { "type": "tcp", "tag": "%s", "server": "%s", "server_port": 53%s }' "$tag" "$server" "$props"
             ;;
         udp://*)
             server=${value#udp://}
             server=${server%%/*}
-            printf '      { "type": "udp", "tag": "%s", "server": "%s", "server_port": 53 }' "$tag" "$server"
+            printf '      { "type": "udp", "tag": "%s", "server": "%s", "server_port": 53%s }' "$tag" "$server" "$props"
             ;;
         *)
-            printf '      { "type": "udp", "tag": "%s", "server": "%s", "server_port": 53 }' "$tag" "$value"
+            printf '      { "type": "udp", "tag": "%s", "server": "%s", "server_port": 53%s }' "$tag" "$value" "$props"
             ;;
     esac
 }
@@ -133,10 +145,87 @@ generate_cn_ruleset() {
 EOF
 }
 
+detect_ecs_subnet() {
+    [ -n "$DNS_CLIENT_SUBNET" ] && printf '%s' "$DNS_CLIENT_SUBNET" && return
+
+    # Check OpenWrt ISP DNS
+    file="/tmp/resolv.conf.d/resolv.conf.auto"
+    [ -f "$file" ] || file="/etc/resolv.conf"
+
+    # Get first public IPv4 nameserver
+    auto_dns=$(grep "^nameserver " "$file" 2>/dev/null | awk '{print $2}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | while read -r ip; do
+        case "$ip" in
+            127.*|10.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|192.168.*|169.254.*) continue ;;
+            *) printf '%s' "$ip"; break ;;
+        esac
+    done)
+
+    [ -n "$auto_dns" ] && printf '%s' "${auto_dns%.*}.0/24"
+}
+
 generate_dns() {
-    direct_server=$(dns_server_json dns_direct "$DNS_DIRECT")
-    proxy_server=$(dns_server_json dns_proxy "$DNS_PROXY")
-    resolver_server=$(dns_server_json dns_resolver "$DNS_RESOLVER")
+    ecs_to_use=$(detect_ecs_subnet)
+    servers_json=""
+    hosts_json='      {
+        "type": "hosts",
+        "tag": "dns_hosts",
+        "predefined": {
+          "dns.alidns.com": ["223.5.5.5", "223.6.6.6", "2400:3200::1", "2400:3200:baba::1"],
+          "doh.pub": ["1.12.12.12", "120.53.53.53", "2402:4e00::"],
+          "dns.google": ["8.8.8.8", "8.8.4.4", "2001:4860:4860::8888", "2001:4860:4860::8844"],
+          "cloudflare-dns.com": ["1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001"],
+          "dns11.quad9.net": ["9.9.9.11", "149.112.112.11", "2620:fe::11", "2620:fe::fe:11"]
+        }
+      }'
+    servers_json="${hosts_json}"
+
+    # Helper function to generate multiple servers and a group
+    # Usage: build_group "base_tag" "csv_list" "detour" "ecs"
+    build_group() {
+        base_tag=$1
+        list=$2
+        detour=$3
+        ecs=$4
+        members=""
+        count=0
+        
+        OLD_IFS=$IFS; IFS=','
+        for s in $list; do
+            [ -z "$s" ] && continue
+            count=$((count+1))
+            tag="${base_tag}_$count"
+            obj=$(dns_server_json "$tag" "$s" "$detour" "$ecs")
+            servers_json="${servers_json},
+${obj}"
+            [ -n "$members" ] && members="${members}, "
+            members="${members}\"$tag\""
+        done
+        IFS=$OLD_IFS
+        
+        if [ $count -gt 1 ]; then
+            servers_json="${servers_json},
+      { \"type\": \"group\", \"tag\": \"$base_tag\", \"servers\": [${members}] }"
+        elif [ $count -eq 1 ]; then
+            # Single member, just alias it with a group or use the member tag?
+            # For simplicity, we always create the group tag to keep references consistent
+            servers_json="${servers_json},
+      { \"type\": \"group\", \"tag\": \"$base_tag\", \"servers\": [${members}] }"
+        fi
+    }
+
+    build_group "dns_resolver" "$DNS_RESOLVER" "" ""
+    build_group "dns_direct" "$DNS_DIRECT" "" "$ecs_to_use"
+    build_group "dns_proxy" "$DNS_PROXY" "GLOBAL" "$ecs_to_use"
+
+    # 4. FakeIP server
+    servers_json="${servers_json},
+      {
+        \"type\": \"fakeip\",
+        \"tag\": \"dns_fakeip\",
+        \"inet4_range\": \"$FAKEIP_INET4\",
+        \"inet6_range\": \"$FAKEIP_INET6\"
+      }"
+
     filter_tmp="$RUNTIME_DIR/fakeip-rules.json"
     filter_rules > "$filter_tmp"
 
@@ -144,15 +233,7 @@ generate_dns() {
 {
   "dns": {
     "servers": [
-$(printf '%s,\n' "$direct_server")
-$(printf '%s,\n' "$proxy_server")
-$(printf '%s,\n' "$resolver_server")
-      {
-        "type": "fakeip",
-        "tag": "dns_fakeip",
-        "inet4_range": "$FAKEIP_INET4",
-        "inet6_range": "$FAKEIP_INET6"
-      }
+${servers_json}
     ],
     "rules": [
       { "clash_mode": "direct", "server": "dns_direct", "strategy": "prefer_ipv4" },
