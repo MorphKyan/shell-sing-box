@@ -26,7 +26,7 @@ permissions:
 
 env:
   SING_BOX_REPO: https://github.com/SagerNet/sing-box.git
-  BUILD_TAGS: with_utls,with_clash_api,badlinkname,tfogo_checklinkname0
+  BUILD_TAGS: with_quic,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0
   GO_VERSION: "1.24.x"
 
 jobs:
