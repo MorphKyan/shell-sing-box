@@ -101,12 +101,14 @@ nft_start() {
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 ip daddr "{ $RESERVE4 }" return
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 udp dport 53 return
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 udp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
+    [ "$QUIC_BYPASS" = "1" ] && nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 udp dport "{ 443, 8443 }" return
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 udp dport "{ $COMMON_PORTS }" meta mark set "$FW_MARK"
     if [ "$ENABLE_IPV6" = "1" ]; then
         nft add rule inet "$NFT_TABLE" udp_tun ip6 saddr != "{ $lan6 }" return
         nft add rule inet "$NFT_TABLE" udp_tun ip6 daddr "{ $RESERVE6 }" return
         nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv6 udp dport 53 return
         nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv6 udp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
+        [ "$QUIC_BYPASS" = "1" ] && nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv6 udp dport "{ 443, 8443 }" return
         nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv6 udp dport "{ $COMMON_PORTS }" meta mark set "$FW_MARK"
     fi
 

@@ -102,6 +102,7 @@ ssb upgrade  # 更新 Shell-Sing-Box 与 sing-box core
 - TUN 接口：`sbtun0`
 - fake-ip IPv4 地址段：`28.0.0.0/8`
 - fake-ip filter 列表：`/etc/sing-box/fake_ip_filter.list`
+- QUIC 直连绕过：`QUIC_BYPASS=1` 时，局域网 UDP `443/8443` 不进入 TUN，用于减少视频/HTTP3 场景的代理抖动。
 
 ## 运行机制与核心功能
 
@@ -120,7 +121,7 @@ ssb upgrade  # 更新 Shell-Sing-Box 与 sing-box core
 默认 DNS 模式为 fake-ip + CN SRS 直连混合。命中 CN rule-set 的流量直连，其余流量透明代理。默认开启 fake-ip 缓存及逆向解析。如果不希望特定域名返回 fake-ip，可以将其加入 `/etc/sing-box/fake_ip_filter.list`（如 `*.lan`, `pool.ntp.org`）。
 
 ### nftables 透明代理
-服务启动时会创建 `table inet singbox` 独立表，实现局域网 TCP 流量重定向至 9998，UDP 流量标记后路由至 `sbtun0`，DNS 劫持至 1053。默认放行局域网访问 API，但阻止 WAN 访问代理和 API 端口。停止服务时自动删除该表并清理策略路由。
+服务启动时会创建 `table inet singbox` 独立表，实现局域网 TCP 流量重定向至 9998，UDP 流量标记后路由至 `sbtun0`，DNS 劫持至 1053。默认开启 `QUIC_BYPASS=1`，局域网 UDP `443/8443` 会在 `udp_tun` 链中提前 `return`，不进入 sing-box TUN。默认放行局域网访问 API，但阻止 WAN 访问代理和 API 端口。停止服务时自动删除该表并清理策略路由。
 
 ## 注意事项
 

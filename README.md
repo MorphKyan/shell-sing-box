@@ -18,6 +18,7 @@ generator.
 - UI directory: `/etc/sing-box/ui`
 - TUN interface: `sbtun0`
 - fake-ip range: `28.0.0.0/8`
+- QUIC bypass: `QUIC_BYPASS=1` returns LAN UDP `443/8443` before TUN marking.
 
 ## Install
 
@@ -301,6 +302,11 @@ http://<router-lan-ip>:9999/ui
 ```
 
 WAN access to `9998`, `9999`, and `1053` is rejected by the custom nft table.
+
+By default `QUIC_BYPASS=1` makes LAN UDP `443/8443` return from the `udp_tun`
+chain before `FW_MARK` is applied. This matches ShellCrash's nftables Mix mode
+when QUIC video optimization is enabled: HTTP/3/QUIC is bypassed instead of
+being sent through the sing-box TUN path.
 
 ## Design Notes
 
