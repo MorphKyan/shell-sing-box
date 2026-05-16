@@ -80,6 +80,7 @@ ssb start    # 启动服务
 ssb stop     # 停止服务
 ssb restart  # 重启服务
 ssb update   # 更新订阅
+ssb upgrade  # 更新 Shell-Sing-Box 与 sing-box core
 ```
 
 系统服务同样支持传统的 `init.d` 脚本命令：`/etc/init.d/shell-sing-box start|stop|restart|enable`
@@ -111,6 +112,7 @@ ssb update   # 更新订阅
 ### 内核与镜像下载
 系统默认优先使用国内可访问性较好的镜像源（如 jsDelivr, ghproxy）。你可以在 `/etc/sing-box/custom.env` 中自定义版本及镜像配置（如 `CORE_VERSION`、`CORE_ARCH` 等）。
 - **内核版本**：自动识别系统架构并优先下载本项目 `update` 分支预打包的精简核心（默认固定为当前预打包稳定版）。项目默认使用 GitHub Actions 编译精简内核，移除了 gVisor、WireGuard 等非必要功能，以适配路由器存储限制。你可以在 `ssb` 菜单中更新内核。
+- **Shell-Sing-Box 更新**：`ssb upgrade` 默认从 `https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@latest` 下载最新 release，并保留已有 `/etc/sing-box/custom.env` 与 `/etc/sing-box/fake_ip_filter.list`；新的默认配置会写入 `.default` 文件。可通过 `SHELL_SING_BOX_REPO_BASE` 和 `SHELL_SING_BOX_CHANNEL` 覆盖更新源。
 - **SRS 规则集**：系统会自动扫描配置中的 remote `.srs`，自动下载至本地进行缓存。如果下载失败将继续使用已有旧缓存。
 - **Zashboard 面板**：可通过 `ssb` 安装。安装后访问地址为：`http://<路由器LAN IP>:9999/ui`。
 

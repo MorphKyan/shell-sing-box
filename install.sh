@@ -2,7 +2,7 @@
 
 set -e
 
-PROJECT_FILES="README.md README_CN.md etc/init.d/shell-sing-box etc/sing-box/custom.env etc/sing-box/fake_ip_filter.list usr/libexec/shell-sing-box/common.sh usr/libexec/shell-sing-box/core-install.sh usr/libexec/shell-sing-box/dashboard.sh usr/libexec/shell-sing-box/firewall.sh usr/libexec/shell-sing-box/generate-system-config.sh usr/libexec/shell-sing-box/prepare.sh usr/libexec/shell-sing-box/srs-update.sh usr/libexec/shell-sing-box/task.sh usr/sbin/ssb"
+PROJECT_FILES="README.md README_CN.md install.sh etc/init.d/shell-sing-box etc/sing-box/custom.env etc/sing-box/fake_ip_filter.list usr/libexec/shell-sing-box/VERSION usr/libexec/shell-sing-box/common.sh usr/libexec/shell-sing-box/core-install.sh usr/libexec/shell-sing-box/dashboard.sh usr/libexec/shell-sing-box/firewall.sh usr/libexec/shell-sing-box/generate-system-config.sh usr/libexec/shell-sing-box/prepare.sh usr/libexec/shell-sing-box/srs-update.sh usr/libexec/shell-sing-box/task.sh usr/sbin/ssb"
 SRC_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 copy_tree() {
@@ -11,6 +11,18 @@ copy_tree() {
     [ -d "$src" ] || return 0
     mkdir -p "$dst"
     cp -R "$src"/. "$dst"/
+}
+
+install_config_file() {
+    src=$1
+    dst=$2
+    [ -f "$src" ] || return 0
+    mkdir -p "$(dirname "$dst")"
+    if [ -f "$dst" ]; then
+        cp -f "$src" "$dst.default"
+    else
+        cp -f "$src" "$dst"
+    fi
 }
 
 need_root() {
@@ -76,7 +88,12 @@ main() {
     need_root
     bootstrap_remote
     install_packages
-    copy_tree "$SRC_DIR/etc" /etc
+    mkdir -p /etc/init.d /etc/sing-box /usr/share/doc/shell-sing-box
+    cp -f "$SRC_DIR/etc/init.d/shell-sing-box" /etc/init.d/shell-sing-box
+    install_config_file "$SRC_DIR/etc/sing-box/custom.env" /etc/sing-box/custom.env
+    install_config_file "$SRC_DIR/etc/sing-box/fake_ip_filter.list" /etc/sing-box/fake_ip_filter.list
+    [ -f "$SRC_DIR/README.md" ] && cp -f "$SRC_DIR/README.md" /usr/share/doc/shell-sing-box/README.md
+    [ -f "$SRC_DIR/README_CN.md" ] && cp -f "$SRC_DIR/README_CN.md" /usr/share/doc/shell-sing-box/README_CN.md
     copy_tree "$SRC_DIR/usr" /usr
     mkdir -p /etc/sing-box/generated /etc/sing-box/ruleset /etc/sing-box/ui /etc/sing-box/bin /tmp/shell-sing-box
     chmod 755 /etc/init.d/shell-sing-box

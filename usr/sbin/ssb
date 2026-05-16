@@ -2,6 +2,26 @@
 
 [ -f /usr/libexec/shell-sing-box/common.sh ] && . /usr/libexec/shell-sing-box/common.sh
 
+SHELL_SING_BOX_VERSION_FILE=/usr/libexec/shell-sing-box/VERSION
+SHELL_SING_BOX_REPO_BASE=${SHELL_SING_BOX_REPO_BASE:-https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box}
+SHELL_SING_BOX_CHANNEL=${SHELL_SING_BOX_CHANNEL:-latest}
+
+get_shell_sing_box_version() {
+    if [ -f "$SHELL_SING_BOX_VERSION_FILE" ]; then
+        version=$(head -n 1 "$SHELL_SING_BOX_VERSION_FILE" 2>/dev/null)
+        [ -n "$version" ] && printf '%s\n' "$version" && return
+    fi
+    printf '%s\n' "unknown"
+}
+
+get_sing_box_version() {
+    if [ -x "$SING_BOX_BIN" ]; then
+        version=$("$SING_BOX_BIN" version 2>/dev/null | head -n 1)
+        [ -n "$version" ] && printf '%s\n' "$version" && return
+    fi
+    printf '%s\n' "not installed"
+}
+
 show_menu() {
     clear
     echo "=========================================="
@@ -15,6 +35,8 @@ show_menu() {
         status="\033[31m未运行\033[0m"
     fi
     echo -e " 服务状态: $status"
+    echo " Shell-Sing-Box: $(get_shell_sing_box_version)"
+    echo " sing-box: $(get_sing_box_version)"
     echo "=========================================="
     echo "  1. 启动/重启服务 (Start/Restart)"
     echo "  2. 停止服务 (Stop)"
@@ -23,10 +45,11 @@ show_menu() {
     echo "  5. 安装/更新本地面板 (Zashboard)"
     echo "  6. 卸载本地面板"
     echo "  7. 设置自动更新定时任务"
-    echo "  8. 完全卸载 Shell-Sing-Box"
+    echo "  8. 更新 Shell-Sing-Box 与 sing-box core"
+    echo "  9. 完全卸载 Shell-Sing-Box"
     echo "  0. 退出管理面板"
     echo "=========================================="
-    read -p " 请输入数字选项 [0-8]: " choice
+    read -p " 请输入数字选项 [0-9]: " choice
     echo ""
     
     case "$choice" in
@@ -80,6 +103,9 @@ show_menu() {
             set_cron
             ;;
         8)
+            upgrade_shell_sing_box
+            ;;
+        9)
             uninstall_all
             ;;
         0)
@@ -111,6 +137,110 @@ update_sub() {
         fi
     else
         echo "未配置订阅源链接，请先在菜单 [3] 中进行配置。"
+    fi
+}
+
+upgrade_shell_sing_box() {
+    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+
+    if ! command -v download >/dev/null 2>&1; then
+        echo "更新失败: 缺少 /usr/libexec/shell-sing-box/common.sh 或 download 函数"
+        return 1
+    fi
+
+    repo_base=${SHELL_SING_BOX_REPO_BASE:-https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box}
+    channel=${SHELL_SING_BOX_CHANNEL:-latest}
+    repo="${repo_base%/}@${channel}"
+    tmp="${RUNTIME_DIR:-/tmp/shell-sing-box}/upgrade.$$"
+    files="README.md README_CN.md install.sh etc/init.d/shell-sing-box etc/sing-box/custom.env etc/sing-box/fake_ip_filter.list usr/libexec/shell-sing-box/VERSION usr/libexec/shell-sing-box/common.sh usr/libexec/shell-sing-box/core-install.sh usr/libexec/shell-sing-box/dashboard.sh usr/libexec/shell-sing-box/firewall.sh usr/libexec/shell-sing-box/generate-system-config.sh usr/libexec/shell-sing-box/prepare.sh usr/libexec/shell-sing-box/srs-update.sh usr/libexec/shell-sing-box/task.sh usr/sbin/ssb"
+
+    rm -rf "$tmp"
+    mkdir -p "$tmp"
+
+    echo "正在从 jsDelivr 获取最新 Shell-Sing-Box..."
+    echo "更新源: $repo"
+
+    if ! download "$tmp/usr/libexec/shell-sing-box/VERSION" "$repo/usr/libexec/shell-sing-box/VERSION"; then
+        echo "更新失败: 无法下载 VERSION"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    remote_version=$(head -n 1 "$tmp/usr/libexec/shell-sing-box/VERSION" 2>/dev/null)
+    echo "当前版本: $(get_shell_sing_box_version)"
+    echo "远端版本: ${remote_version:-unknown}"
+
+    for file in $files; do
+        printf "下载 %s... " "$file"
+        if download "$tmp/$file" "$repo/$file"; then
+            echo "完成"
+        else
+            echo "失败"
+            echo "更新失败: 无法下载 $file"
+            rm -rf "$tmp"
+            return 1
+        fi
+    done
+
+    for required in \
+        usr/libexec/shell-sing-box/common.sh \
+        usr/sbin/ssb \
+        install.sh \
+        usr/libexec/shell-sing-box/VERSION
+    do
+        if [ ! -f "$tmp/$required" ]; then
+            echo "更新失败: 缺少关键文件 $required"
+            rm -rf "$tmp"
+            return 1
+        fi
+    done
+
+    echo "正在安装 Shell-Sing-Box 文件..."
+    mkdir -p /usr/libexec/shell-sing-box /usr/sbin /etc/init.d /etc/sing-box /usr/share/doc/shell-sing-box
+    cp -f "$tmp"/usr/libexec/shell-sing-box/*.sh /usr/libexec/shell-sing-box/
+    cp -f "$tmp/usr/libexec/shell-sing-box/VERSION" "$SHELL_SING_BOX_VERSION_FILE"
+    cp -f "$tmp/usr/sbin/ssb" /usr/sbin/ssb
+    cp -f "$tmp/etc/init.d/shell-sing-box" /etc/init.d/shell-sing-box
+    [ -f "$tmp/README.md" ] && cp -f "$tmp/README.md" /usr/share/doc/shell-sing-box/README.md
+    [ -f "$tmp/README_CN.md" ] && cp -f "$tmp/README_CN.md" /usr/share/doc/shell-sing-box/README_CN.md
+
+    if [ -f "$tmp/etc/sing-box/custom.env" ]; then
+        if [ -f /etc/sing-box/custom.env ]; then
+            cp -f "$tmp/etc/sing-box/custom.env" /etc/sing-box/custom.env.default
+        else
+            cp -f "$tmp/etc/sing-box/custom.env" /etc/sing-box/custom.env
+        fi
+    fi
+
+    if [ -f "$tmp/etc/sing-box/fake_ip_filter.list" ]; then
+        if [ -f /etc/sing-box/fake_ip_filter.list ]; then
+            cp -f "$tmp/etc/sing-box/fake_ip_filter.list" /etc/sing-box/fake_ip_filter.list.default
+        else
+            cp -f "$tmp/etc/sing-box/fake_ip_filter.list" /etc/sing-box/fake_ip_filter.list
+        fi
+    fi
+
+    chmod 755 /etc/init.d/shell-sing-box
+    chmod 755 /usr/libexec/shell-sing-box/*.sh
+    chmod 755 /usr/sbin/ssb
+
+    echo "正在更新 sing-box core..."
+    if ! /usr/libexec/shell-sing-box/core-install.sh; then
+        echo "Shell-Sing-Box 文件已更新，但 sing-box core 更新失败。"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    rm -rf "$tmp"
+    echo "更新完成。"
+    echo "Shell-Sing-Box: $(get_shell_sing_box_version)"
+    echo "sing-box: $(get_sing_box_version)"
+
+    read -p "是否立即重启 shell-sing-box？(y/n): " restart_now
+    if [ "$restart_now" = "y" ] || [ "$restart_now" = "Y" ]; then
+        /etc/init.d/shell-sing-box restart
+    else
+        echo "已跳过重启。"
     fi
 }
 
@@ -183,9 +313,10 @@ if [ -n "$1" ]; then
         stop) /etc/init.d/shell-sing-box stop ;;
         restart) /etc/init.d/shell-sing-box restart ;;
         update) update_sub ;;
+        upgrade) upgrade_shell_sing_box ;;
         install) /usr/libexec/shell-sing-box/task.sh update-dashboard ;;
         uninstall-ui) /usr/libexec/shell-sing-box/dashboard.sh uninstall ;;
-        *) echo "Usage: $0 {start|stop|restart|update|install|uninstall-ui|menu}" ;;
+        *) echo "Usage: $0 {start|stop|restart|update|upgrade|install|uninstall-ui|menu}" ;;
     esac
 else
     show_menu

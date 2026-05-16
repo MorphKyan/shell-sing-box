@@ -90,6 +90,7 @@ ssb start    # Start service
 ssb stop     # Stop service
 ssb restart  # Restart service
 ssb update   # Update subscription
+ssb upgrade  # Upgrade Shell-Sing-Box and sing-box core
 ```
 
 ## Configuration
@@ -108,6 +109,8 @@ Important settings:
 - `GITHUB_PROXY_PREFIX=https://gh.llkk.cc/`
 - `CORE_DOWNLOAD_PREFIX=https://gh.llkk.cc/`
 - `CORE_ALLOW_RELEASE_FALLBACK=0`
+- `SHELL_SING_BOX_REPO_BASE=https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box`
+- `SHELL_SING_BOX_CHANNEL=latest`
 - `REDIR_PORT=9998`
 - `API_PORT=9999`
 - `DNS_PORT=1053`
@@ -118,6 +121,11 @@ Important settings:
 - `MIRROR_PREFIX=https://testingcf.jsdelivr.net/gh/`
 
 Edit `/etc/sing-box/fake_ip_filter.list` for fake-ip exclusions.
+
+`ssb upgrade` downloads the latest Shell-Sing-Box release from jsDelivr by
+default, updates program files and sing-box core, and preserves existing
+`/etc/sing-box/custom.env` and `/etc/sing-box/fake_ip_filter.list`. New default
+copies are written as `.default` files when user config already exists.
 
 ## sing-box Core
 
