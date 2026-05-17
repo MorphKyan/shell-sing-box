@@ -87,9 +87,20 @@ nft_start() {
     nft add rule inet "$NFT_TABLE" dns_hijack meta nfproto ipv4 ip saddr != "{ $lan4 }" return
     nft add rule inet "$NFT_TABLE" dns_hijack meta nfproto ipv4 udp dport 53 redirect to "$DNS_PORT"
     nft add rule inet "$NFT_TABLE" dns_hijack meta nfproto ipv4 tcp dport 53 redirect to "$DNS_PORT"
-    nft add rule inet "$NFT_TABLE" dns_hijack ip6 saddr != "{ $lan6 }" return
-    nft add rule inet "$NFT_TABLE" dns_hijack ip6 nexthdr udp udp dport 53 redirect to "$DNS_PORT"
-    nft add rule inet "$NFT_TABLE" dns_hijack ip6 nexthdr tcp tcp dport 53 redirect to "$DNS_PORT"
+    if nft add rule inet "$NFT_TABLE" dns_hijack ip6 saddr != "{ $lan6 }" return 2>/dev/null \
+       && nft add rule inet "$NFT_TABLE" dns_hijack ip6 nexthdr udp udp dport 53 redirect to "$DNS_PORT" 2>/dev/null \
+       && nft add rule inet "$NFT_TABLE" dns_hijack ip6 nexthdr tcp tcp dport 53 redirect to "$DNS_PORT" 2>/dev/null; then
+        log "IPv6 DNS hijack enabled (redirect)"
+    else
+        # Kernel lacks IPv6 NAT; drop IPv6 DNS from LAN to force clients to
+        # fall back to IPv4 DNS, which is properly redirected to sing-box.
+        nft add chain inet "$NFT_TABLE" dns6_drop "{ type filter hook prerouting priority -150; policy accept; }"
+        nft add rule inet "$NFT_TABLE" dns6_drop meta mark "$FW_MARK" return
+        nft add rule inet "$NFT_TABLE" dns6_drop ip6 saddr != "{ $lan6 }" return
+        nft add rule inet "$NFT_TABLE" dns6_drop ip6 nexthdr udp udp dport 53 drop
+        nft add rule inet "$NFT_TABLE" dns6_drop ip6 nexthdr tcp tcp dport 53 drop
+        log "IPv6 DNS hijack enabled (drop, no IPv6 NAT support)"
+    fi
 
     nft add rule inet "$NFT_TABLE" tcp_redir meta mark "$FW_MARK" return
     [ "$ENABLE_IPV6" != "1" ] && nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv6 return

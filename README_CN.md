@@ -28,7 +28,7 @@ export url='https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@main' \
 如果设备没有 `curl`，使用 `wget`：
 
 ```sh
-export url='https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@v1.0.3' \
+export url='https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@v1.0.5' \
   && wget --no-check-certificate -q -O /tmp/shell-sing-box-install.sh "$url/install.sh" \
   && sh /tmp/shell-sing-box-install.sh
 ```
