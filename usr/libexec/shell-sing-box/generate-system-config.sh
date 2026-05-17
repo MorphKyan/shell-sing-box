@@ -87,7 +87,27 @@ normalize_generated_rulesets() {
             return parts[n]
         }
         function flush_remote(close_line, i, last) {
-            for (i = 1; i <= n; i++) print buf[i]
+            # If the remote entry has a url but no explicit path, inject one
+            if (url != "" && path == "") {
+                last = n
+                # Print all buffered lines, adding comma to the last one
+                for (i = 1; i <= last; i++) {
+                    if (i == last) {
+                        line = buf[i]
+                        # Add trailing comma if not already present
+                        if (line !~ /,[[:space:]]*$/) {
+                            sub(/[[:space:]]*$/, "", line)
+                            line = line ","
+                        }
+                        print line
+                    } else {
+                        print buf[i]
+                    }
+                }
+                printf "%s\"path\": \"%s/%s\"\n", "        ", ruleset_dir, basename(url)
+            } else {
+                for (i = 1; i <= n; i++) print buf[i]
+            }
             print close_line
             remote=0; n=0; url=""; path=""
         }
@@ -136,7 +156,8 @@ generate_cn_ruleset() {
         "type": "remote",
         "tag": "$CN_RULESET_TAG",
         "format": "binary",
-        "url": "https://raw.githubusercontent.com/DustinWin/ruleset_geodata/sing-box-ruleset/cn.srs"
+        "url": "https://raw.githubusercontent.com/DustinWin/ruleset_geodata/sing-box-ruleset/cn.srs",
+        "path": "$RULESET_DIR/cn.srs"
       }
     ]
   }
@@ -208,13 +229,21 @@ ${obj}"
     build_group "dns_direct" "$DNS_DIRECT" "" "$ecs_to_use"
     build_group "dns_proxy" "$DNS_PROXY" "GLOBAL" "$ecs_to_use"
 
+    dns_strategy="prefer_ipv4"
+    fakeip_query_types='"A", "AAAA"'
+    fakeip_inet6_line=",\n        \"inet6_range\": \"$FAKEIP_INET6\""
+    if [ "$ENABLE_IPV6" != "1" ]; then
+        dns_strategy="ipv4_only"
+        # 保留 FakeIP AAAA 响应和 inet6_range，防止浏览器通过 Happy Eyeballs
+        # 获取真实 IPv6 地址直连绕过代理
+    fi
+
     # 4. FakeIP server
     servers_json="${servers_json},
       {
         \"type\": \"fakeip\",
         \"tag\": \"dns_fakeip\",
-        \"inet4_range\": \"$FAKEIP_INET4\",
-        \"inet6_range\": \"$FAKEIP_INET6\"
+        \"inet4_range\": \"$FAKEIP_INET4\"$(printf '%b' "$fakeip_inet6_line")
       }"
 
     filter_tmp="$RUNTIME_DIR/fakeip-rules.json"
@@ -230,13 +259,13 @@ ${obj}"
 ${servers_json}
     ],
     "rules": [
-      { "clash_mode": "direct", "server": "dns_direct", "strategy": "prefer_ipv4" },
+      { "clash_mode": "direct", "server": "dns_direct", "strategy": "$dns_strategy" },
 $(cat "$filter_tmp")
-      { "rule_set": ["$CN_RULESET_TAG"], "server": "dns_direct", "strategy": "prefer_ipv4" },
-      { "query_type": ["A", "AAAA"], "server": "dns_fakeip", "strategy": "prefer_ipv4", "rewrite_ttl": 1 }
+      { "rule_set": ["$CN_RULESET_TAG"], "server": "dns_direct", "strategy": "$dns_strategy" },
+      { "query_type": [$fakeip_query_types], "server": "dns_fakeip", "strategy": "$dns_strategy", "rewrite_ttl": 1 }
     ],
     "final": "dns_proxy",
-    "strategy": "prefer_ipv4",
+    "strategy": "$dns_strategy",
     "cache_capacity": 1024,
     "reverse_mapping": true${ecs_json}
   }

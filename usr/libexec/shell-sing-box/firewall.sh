@@ -18,8 +18,9 @@ list6() {
 }
 
 wait_tun() {
+    limit=${1:-60}
     i=0
-    while [ "$i" -lt 20 ]; do
+    while [ "$i" -lt "$limit" ]; do
         ip link show "$TUN_NAME" >/dev/null 2>&1 && return 0
         sleep 1
         i=$((i + 1))
@@ -27,17 +28,28 @@ wait_tun() {
     return 1
 }
 
+install_policy_route() {
+    ip route replace default dev "$TUN_NAME" table "$ROUTE_TABLE" 2>&1 | while read -r line; do log "route: $line"; done
+    ip rule add fwmark "$FW_MARK" table "$ROUTE_TABLE" priority "$ROUTE_TABLE" 2>/dev/null || true
+    if [ "$ENABLE_IPV6" = "1" ]; then
+        ip -6 route replace default dev "$TUN_NAME" table "$((ROUTE_TABLE + 1))" 2>&1 | while read -r line; do log "route6: $line"; done
+        ip -6 rule add fwmark "$FW_MARK" table "$((ROUTE_TABLE + 1))" priority "$((ROUTE_TABLE + 1))" 2>/dev/null || true
+    fi
+    log "policy route installed for $TUN_NAME"
+}
+
 route_start() {
-    if wait_tun; then
-        ip route replace default dev "$TUN_NAME" table "$ROUTE_TABLE" 2>/dev/null || true
-        ip rule add fwmark "$FW_MARK" table "$ROUTE_TABLE" priority "$ROUTE_TABLE" 2>/dev/null || true
-        if [ "$ENABLE_IPV6" = "1" ]; then
-            ip -6 route replace default dev "$TUN_NAME" table "$((ROUTE_TABLE + 1))" 2>/dev/null || true
-            ip -6 rule add fwmark "$FW_MARK" table "$((ROUTE_TABLE + 1))" priority "$((ROUTE_TABLE + 1))" 2>/dev/null || true
-        fi
-        log "policy route installed for $TUN_NAME"
+    if wait_tun 15; then
+        install_policy_route
     else
-        log "tun interface $TUN_NAME not found; UDP tun redirection skipped until restart"
+        log "tun interface $TUN_NAME not ready; policy route installation will retry in background"
+        (
+            if wait_tun 180; then
+                install_policy_route
+            else
+                log "tun interface $TUN_NAME not found; UDP tun redirection skipped until restart"
+            fi
+        ) >/dev/null 2>&1 &
     fi
 }
 
@@ -72,24 +84,25 @@ nft_start() {
     nft add rule inet "$NFT_TABLE" forward oifname "$TUN_NAME" accept
 
     nft add rule inet "$NFT_TABLE" dns_hijack meta mark "$FW_MARK" return
-    [ "$ENABLE_IPV6" != "1" ] && nft add rule inet "$NFT_TABLE" dns_hijack meta nfproto ipv6 return
     nft add rule inet "$NFT_TABLE" dns_hijack meta nfproto ipv4 ip saddr != "{ $lan4 }" return
     nft add rule inet "$NFT_TABLE" dns_hijack meta nfproto ipv4 udp dport 53 redirect to "$DNS_PORT"
     nft add rule inet "$NFT_TABLE" dns_hijack meta nfproto ipv4 tcp dport 53 redirect to "$DNS_PORT"
-    [ "$ENABLE_IPV6" = "1" ] && {
-        nft add rule inet "$NFT_TABLE" dns_hijack ip6 saddr != "{ $lan6 }" return
-        nft add rule inet "$NFT_TABLE" dns_hijack ip6 nexthdr udp udp dport 53 redirect to "$DNS_PORT"
-        nft add rule inet "$NFT_TABLE" dns_hijack ip6 nexthdr tcp tcp dport 53 redirect to "$DNS_PORT"
-    }
+    nft add rule inet "$NFT_TABLE" dns_hijack ip6 saddr != "{ $lan6 }" return
+    nft add rule inet "$NFT_TABLE" dns_hijack ip6 nexthdr udp udp dport 53 redirect to "$DNS_PORT"
+    nft add rule inet "$NFT_TABLE" dns_hijack ip6 nexthdr tcp tcp dport 53 redirect to "$DNS_PORT"
 
     nft add rule inet "$NFT_TABLE" tcp_redir meta mark "$FW_MARK" return
     [ "$ENABLE_IPV6" != "1" ] && nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv6 return
     nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv4 ip saddr != "{ $lan4 }" return
+    nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv4 ip daddr "$FAKEIP_INET4" tcp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
+    nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv4 ip daddr "$FAKEIP_INET4" meta l4proto tcp redirect to "$REDIR_PORT"
     nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv4 ip daddr "{ $RESERVE4 }" return
     nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv4 tcp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
     nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv4 tcp dport "{ $COMMON_PORTS }" redirect to "$REDIR_PORT"
     if [ "$ENABLE_IPV6" = "1" ]; then
         nft add rule inet "$NFT_TABLE" tcp_redir ip6 saddr != "{ $lan6 }" return
+        nft add rule inet "$NFT_TABLE" tcp_redir ip6 daddr "$FAKEIP_INET6" tcp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
+        nft add rule inet "$NFT_TABLE" tcp_redir ip6 daddr "$FAKEIP_INET6" meta l4proto tcp redirect to "$REDIR_PORT"
         nft add rule inet "$NFT_TABLE" tcp_redir ip6 daddr "{ $RESERVE6 }" return
         nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv6 tcp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
         nft add rule inet "$NFT_TABLE" tcp_redir meta nfproto ipv6 tcp dport "{ $COMMON_PORTS }" redirect to "$REDIR_PORT"
@@ -98,6 +111,9 @@ nft_start() {
     nft add rule inet "$NFT_TABLE" udp_tun meta mark "$FW_MARK" return
     [ "$ENABLE_IPV6" != "1" ] && nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv6 return
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 ip saddr != "{ $lan4 }" return
+    nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 ip daddr "$FAKEIP_INET4" udp dport 53 return
+    nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 ip daddr "$FAKEIP_INET4" udp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
+    nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 ip daddr "$FAKEIP_INET4" meta mark set "$FW_MARK"
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 ip daddr "{ $RESERVE4 }" return
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 udp dport 53 return
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 udp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
@@ -105,6 +121,9 @@ nft_start() {
     nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv4 udp dport "{ $COMMON_PORTS }" meta mark set "$FW_MARK"
     if [ "$ENABLE_IPV6" = "1" ]; then
         nft add rule inet "$NFT_TABLE" udp_tun ip6 saddr != "{ $lan6 }" return
+        nft add rule inet "$NFT_TABLE" udp_tun ip6 daddr "$FAKEIP_INET6" udp dport 53 return
+        nft add rule inet "$NFT_TABLE" udp_tun ip6 daddr "$FAKEIP_INET6" udp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return
+        nft add rule inet "$NFT_TABLE" udp_tun ip6 daddr "$FAKEIP_INET6" meta mark set "$FW_MARK"
         nft add rule inet "$NFT_TABLE" udp_tun ip6 daddr "{ $RESERVE6 }" return
         nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv6 udp dport 53 return
         nft add rule inet "$NFT_TABLE" udp_tun meta nfproto ipv6 udp dport "{ $REDIR_PORT, $API_PORT, $DNS_PORT }" return

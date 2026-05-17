@@ -23,6 +23,8 @@ get_sing_box_version() {
 }
 
 show_menu() {
+    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+
     clear
     echo "=========================================="
     echo "          Shell-Sing-Box 管理面板         "
@@ -35,6 +37,12 @@ show_menu() {
         status="\033[31m未运行\033[0m"
     fi
     echo -e " 服务状态: $status"
+    if [ "${ENABLE_IPV6:-0}" = "1" ]; then
+        ipv6_status="\033[32m开启\033[0m"
+    else
+        ipv6_status="\033[31m关闭\033[0m"
+    fi
+    echo -e " IPv6 支持: $ipv6_status"
     echo " Shell-Sing-Box: $(get_shell_sing_box_version)"
     echo " sing-box: $(get_sing_box_version)"
     echo "=========================================="
@@ -46,10 +54,11 @@ show_menu() {
     echo "  6. 卸载本地面板"
     echo "  7. 设置自动更新定时任务"
     echo "  8. 更新 Shell-Sing-Box 与 sing-box core"
-    echo "  9. 完全卸载 Shell-Sing-Box"
+    echo "  9. IPv6 支持开关"
+    echo " 10. 完全卸载 Shell-Sing-Box"
     echo "  0. 退出管理面板"
     echo "=========================================="
-    read -p " 请输入数字选项 [0-9]: " choice
+    read -p " 请输入数字选项 [0-10]: " choice
     echo ""
     
     case "$choice" in
@@ -106,6 +115,9 @@ show_menu() {
             upgrade_shell_sing_box
             ;;
         9)
+            toggle_ipv6
+            ;;
+        10)
             uninstall_all
             ;;
         0)
@@ -278,6 +290,38 @@ set_cron() {
             ;;
         *)
             echo "输入无效。"
+            ;;
+    esac
+}
+
+toggle_ipv6() {
+    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+
+    if [ "${ENABLE_IPV6:-0}" = "1" ]; then
+        new_value=0
+        new_status="关闭"
+    else
+        new_value=1
+        new_status="开启"
+    fi
+
+    if [ -f "$ENV_FILE" ]; then
+        sed -i '/^ENABLE_IPV6=/d' "$ENV_FILE"
+    else
+        mkdir -p "$(dirname "$ENV_FILE")"
+    fi
+    echo "ENABLE_IPV6=$new_value" >> "$ENV_FILE"
+    ENABLE_IPV6=$new_value
+
+    echo "IPv6 支持已${new_status}。"
+    echo "提示: 需要重启 shell-sing-box 服务后生效。"
+    read -p "是否立即重启 shell-sing-box？(y/N): " restart_now
+    case "$restart_now" in
+        y|Y)
+            /etc/init.d/shell-sing-box restart
+            ;;
+        *)
+            echo "已跳过重启。"
             ;;
     esac
 }

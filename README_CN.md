@@ -28,7 +28,7 @@ export url='https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@main' \
 如果设备没有 `curl`，使用 `wget`：
 
 ```sh
-export url='https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@1.0.1' \
+export url='https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@v1.0.3' \
   && wget --no-check-certificate -q -O /tmp/shell-sing-box-install.sh "$url/install.sh" \
   && sh /tmp/shell-sing-box-install.sh
 ```
@@ -80,7 +80,6 @@ ssb start    # 启动服务
 ssb stop     # 停止服务
 ssb restart  # 重启服务
 ssb update   # 更新订阅
-ssb upgrade  # 更新 Shell-Sing-Box 与 sing-box core
 ```
 
 系统服务同样支持传统的 `init.d` 脚本命令：`/etc/init.d/shell-sing-box start|stop|restart|enable`
@@ -102,7 +101,6 @@ ssb upgrade  # 更新 Shell-Sing-Box 与 sing-box core
 - TUN 接口：`sbtun0`
 - fake-ip IPv4 地址段：`28.0.0.0/8`
 - fake-ip filter 列表：`/etc/sing-box/fake_ip_filter.list`
-- QUIC 直连绕过：`QUIC_BYPASS=1` 时，局域网 UDP `443/8443` 不进入 TUN，用于减少视频/HTTP3 场景的代理抖动。
 
 ## 运行机制与核心功能
 
@@ -113,7 +111,6 @@ ssb upgrade  # 更新 Shell-Sing-Box 与 sing-box core
 ### 内核与镜像下载
 系统默认优先使用国内可访问性较好的镜像源（如 jsDelivr, ghproxy）。你可以在 `/etc/sing-box/custom.env` 中自定义版本及镜像配置（如 `CORE_VERSION`、`CORE_ARCH` 等）。
 - **内核版本**：自动识别系统架构并优先下载本项目 `update` 分支预打包的精简核心（默认固定为当前预打包稳定版）。项目默认使用 GitHub Actions 编译精简内核，移除了 gVisor、WireGuard 等非必要功能，以适配路由器存储限制。你可以在 `ssb` 菜单中更新内核。
-- **Shell-Sing-Box 更新**：`ssb upgrade` 默认从 `https://testingcf.jsdelivr.net/gh/MorphKyan/shell-sing-box@latest` 下载最新 release，并保留已有 `/etc/sing-box/custom.env` 与 `/etc/sing-box/fake_ip_filter.list`；新的默认配置会写入 `.default` 文件。可通过 `SHELL_SING_BOX_REPO_BASE` 和 `SHELL_SING_BOX_CHANNEL` 覆盖更新源。
 - **SRS 规则集**：系统会自动扫描配置中的 remote `.srs`，自动下载至本地进行缓存。如果下载失败将继续使用已有旧缓存。
 - **Zashboard 面板**：可通过 `ssb` 安装。安装后访问地址为：`http://<路由器LAN IP>:9999/ui`。
 
@@ -121,7 +118,7 @@ ssb upgrade  # 更新 Shell-Sing-Box 与 sing-box core
 默认 DNS 模式为 fake-ip + CN SRS 直连混合。命中 CN rule-set 的流量直连，其余流量透明代理。默认开启 fake-ip 缓存及逆向解析。如果不希望特定域名返回 fake-ip，可以将其加入 `/etc/sing-box/fake_ip_filter.list`（如 `*.lan`, `pool.ntp.org`）。
 
 ### nftables 透明代理
-服务启动时会创建 `table inet singbox` 独立表，实现局域网 TCP 流量重定向至 9998，UDP 流量标记后路由至 `sbtun0`，DNS 劫持至 1053。默认开启 `QUIC_BYPASS=1`，局域网 UDP `443/8443` 会在 `udp_tun` 链中提前 `return`，不进入 sing-box TUN。默认放行局域网访问 API，但阻止 WAN 访问代理和 API 端口。停止服务时自动删除该表并清理策略路由。
+服务启动时会创建 `table inet singbox` 独立表，实现局域网 TCP 流量重定向至 9998，UDP 流量标记后路由至 `sbtun0`，DNS 劫持至 1053。默认放行局域网访问 API，但阻止 WAN 访问代理和 API 端口。停止服务时自动删除该表并清理策略路由。
 
 ## 注意事项
 
